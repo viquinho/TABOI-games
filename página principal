@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taboi Games - Exposição de Jogos</title>
+    <style>
+        /* Reset de estilos básicos */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1c1c1c;
+            color: white;
+            text-align: center;
+        }
+
+        /* Animação de fade-in no carregamento */
+        .fade-in {
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Estilo da header */
+        .header {
+            background-color: #2d2d2d;
+            padding: 40px;
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        .header h1 {
+            color: #4c6ef5;
+            font-size: 48px;
+        }
+
+        /* Estilo da imagem do logo */
+        .logo-container {
+            margin-top: 20px;
+        }
+
+        .logo-container img {
+            width: 200px;
+            height: auto;
+            border-radius: 10px;
+            animation: scaleUp 1s ease-in-out;
+        }
+
+        @keyframes scaleUp {
+            0% {
+                transform: scale(0.8);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* Sobre a empresa */
+        .about {
+            background-color: #333;
+            padding: 40px;
+            margin-top: 20px;
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        .about h2 {
+            color: #4c6ef5;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .about p {
+            font-size: 18px;
+            color: #bbb;
+            line-height: 1.6;
+        }
+
+        /* Estilo dos jogos */
+        .games-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .game-card {
+            background-color: #333;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s;
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        .game-card:hover {
+            transform: scale(1.05);
+        }
+
+        .game-card img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .game-title {
+            font-size: 20px;
+            color: #4c6ef5;
+            margin-top: 10px;
+        }
+
+        .game-description {
+            font-size: 16px;
+            margin-top: 5px;
+            color: #bbb;
+        }
+
+        .button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #4c6ef5;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .button:hover {
+            background-color: #3b5ddf;
+        }
+
+        /* Animação de scroll */
+        .game-card {
+            opacity: 0;
+            animation: fadeInUp 1s ease-in-out forwards;
+        }
+
+        @keyframes fadeInUp {
+            0% {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header com o logo -->
+    <div class="header fade-in">
+        <h1>Taboi Games</h1>
+        <div class="logo-container">
+            <img src="Logo_for_a_video_game_company_called_'Taboi_Games'.png" alt="Taboi Games Logo">
+        </div>
+    </div>
+
+    <!-- Sobre a empresa -->
+    <div class="about fade-in">
+        <h2>Sobre a Taboi Games</h2>
+        <p>Taboi Games é uma desenvolvedora de jogos focada em criar experiências imersivas e inovadoras. Com uma equipe apaixonada por tecnologia e design, buscamos sempre entregar entretenimento de alta qualidade, com jogos que envolvem criatividade, estratégia e ação. Seja jogando no navegador ou no celular, nossos jogos são feitos para todos se divertirem de qualquer lugar!</p>
+    </div>
+
+    <!-- Exposição de Jogos -->
+    <div class="games-gallery">
+        <!-- Jogo 1 -->
+        <div class="game-card">
+            <img src="https://i.pinimg.com/736x/31/46/fb/3146fb9383723d95371b5b1da16e7123.jpg" alt="Jogo 1">
+            <div class="game-title">AntColony</div>
+            <div class="game-description">Um jogo básico e muito legal de formiga.</div>
+            <a href="game1.html" target="_blank"><button class="button">Jogar no Navegador</button></a>
+            <a href="game1.apk" download><button class="button">Baixar para Celular</button></a>
+        </div>
+
+        <!-- Jogo 2 -->
+        <div class="game-card">
+            <img src="game2-thumbnail.png" alt="Jogo 2">
+            <div class="game-title">Jogo de Estratégia</div>
+            <div class="game-description">Desafie suas habilidades de estratégia e tática.</div>
+            <a href="game2.html" target="_blank"><button class="button">Jogar no Navegador</button></a>
+            <a href="game2.apk" download><button class="button">Baixar para Celular</button></a>
+        </div>
+
+        <!-- Jogo 3 -->
+        <div class="game-card">
+            <img src="https://codewithcurious.com/wp-content/uploads/2023/02/car1-300x238.jpeg.webp" alt="Jogo 3">
+            <div class="game-title">CarRacing</div>
+            <div class="game-description">Corra contra o tempo e vença seus adversários.</div>
+            <a href="game3.html" target="_blank"><button class="button">Jogar no Navegador</button></a>
+            <a href="game3.apk" download><button class="button">Baixar para Celular</button></a>
+        </div>
+
+        <!-- Adicione mais jogos conforme necessário -->
+    </div>
+</body>
+</html>
