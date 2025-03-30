@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Basic Pong HTML Game</title>
+  <meta charset="UTF-8">
+  <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: black;
+  }
+  canvas { display: none; }
+  .menu {
+    text-align: center;
+    color: white;
+    font-family: Arial, sans-serif;
+  }
+  .menu img {
+    width: 200px;
+    display: block;
+    margin: 0 auto 20px;
+  }
+  .button {
+    background: white;
+    color: black;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+  }
+  #settings { display: none; position: absolute; background: white; padding: 20px; top: 20%; left: 50%; transform: translateX(-50%); }
+  </style>
+</head>
+<body>
+<div class="menu" id="menu">
+  <h1>TABOI GAMES</h1>
+  <img src="https://previews.dropbox.com/p/thumb/ACmp0AgQNyiiP9OMoRnsm9zTsORy1dk5GAMC_ePENB1U2jJKX_h6aqOLY6ewtkIQUXXp9VfIgtNJJU3l-7l3PLsgtDGKBM6jughYuTHSmL1VPj4H59aQnVjf7kn4bqfpGxItg0S8lm1KK5Fx4iqXxGKd72gQUvaxqtYolLk1zyg_hpQvvGJ6dYhHuETFZLzKcEOPn2q0ldzdN0AUYpu_hmfhfpYMUmktLG1QEGDo2nZyp22KY4zA8cMhJiwnETQeRsI7JW1C8BGqC1w9mKUiYk5HcsN8i2UaXpN6YHAtVrBWFO1egOGECOwl0YkJdFIeOlNSyftuxxtluljuM8Q9AlOX/p.jpeg?is_prewarmed=true" alt="Game Logo">
+  <button class="button" onclick="startGame()">Jogar</button>
+</div>
+<div id="settings">
+  <h3>Escolha uma cor:</h3>
+  <button onclick="changeColor('red')">Vermelho</button>
+  <button onclick="changeColor('blue')">Azul</button>
+  <button onclick="changeColor('green')">Verde</button>
+  <button onclick="resumeGame()">Voltar</button>
+</div>
+<canvas width="750" height="585" id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const context = canvas.getContext('2d');
+const grid = 15;
+const paddleHeight = grid * 5;
+const maxPaddleY = canvas.height - grid - paddleHeight;
+let paddleSpeed = 6, ballSpeed = 5;
+let leftScore = 0, rightScore = 0, gamePaused = false;
+let color = 'white';
+
+const leftPaddle = { x: grid * 2, y: canvas.height / 2 - paddleHeight / 2, width: grid, height: paddleHeight, dy: 0 };
+const rightPaddle = { x: canvas.width - grid * 3, y: canvas.height / 2 - paddleHeight / 2, width: grid, height: paddleHeight, dy: 0 };
+const ball = { x: canvas.width / 2, y: canvas.height / 2, width: grid, height: grid, resetting: false, dx: ballSpeed, dy: -ballSpeed };
+
+function startGame() {
+  document.getElementById('menu').style.display = 'none';
+  canvas.style.display = 'block';
+  requestAnimationFrame(loop);
+}
+
+function changeColor(newColor) {
+  color = newColor;
+}
+
+function collides(obj1, obj2) {
+  return obj1.x < obj2.x + obj2.width && obj1.x + obj1.width > obj2.x && obj1.y < obj2.y + obj2.height && obj1.y + obj1.height > obj2.y;
+}
+
+function loop() {
+  if (gamePaused) return;
+  requestAnimationFrame(loop);
+  context.clearRect(0,0,canvas.width,canvas.height);
+
+  leftPaddle.y += leftPaddle.dy;
+  rightPaddle.y += rightPaddle.dy;
+  leftPaddle.y = Math.max(grid, Math.min(maxPaddleY, leftPaddle.y));
+  rightPaddle.y = Math.max(grid, Math.min(maxPaddleY, rightPaddle.y));
+  
+  context.fillStyle = color;
+  context.fillRect(leftPaddle.x, leftPaddle.y, leftPaddle.width, leftPaddle.height);
+  context.fillRect(rightPaddle.x, rightPaddle.y, rightPaddle.width, rightPaddle.height);
+  
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+  
+  if (ball.y < grid || ball.y + grid > canvas.height - grid) ball.dy *= -1;
+  
+  if (ball.x < 0) { rightScore++; resetBall(); }
+  if (ball.x > canvas.width) { leftScore++; resetBall(); }
+  
+  if (collides(ball, leftPaddle)) { ball.dx *= -1; ball.x = leftPaddle.x + leftPaddle.width; }
+  if (collides(ball, rightPaddle)) { ball.dx *= -1; ball.x = rightPaddle.x - ball.width; }
+  
+  context.fillRect(ball.x, ball.y, ball.width, ball.height);
+  context.fillStyle = color;
+  context.fillRect(0, 0, canvas.width, grid);
+  context.fillRect(0, canvas.height - grid, canvas.width, grid);
+  
+  for (let i = grid; i < canvas.height - grid; i += grid * 2) {
+    context.fillRect(canvas.width / 2 - grid / 2, i, grid, grid);
+  }
+  
+  context.font = '20px Arial';
+  context.fillText(leftScore, canvas.width / 4, 30);
+  context.fillText(rightScore, (canvas.width / 4) * 3, 30);
+}
+
+function resetBall() {
+  ball.x = canvas.width / 2;
+  ball.y = canvas.height / 2;
+  ball.dx = ballSpeed * (Math.random() > 0.5 ? 1 : -1);
+  ball.dy = ballSpeed * (Math.random() > 0.5 ? 1 : -1);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.which === 38) rightPaddle.dy = -paddleSpeed;
+  else if (e.which === 40) rightPaddle.dy = paddleSpeed;
+  else if (e.which === 87) leftPaddle.dy = -paddleSpeed;
+  else if (e.which === 83) leftPaddle.dy = paddleSpeed;
+  else if (e.which === 27) togglePause();
+});
+
+document.addEventListener('keyup', function(e) {
+  if (e.which === 38 || e.which === 40) rightPaddle.dy = 0;
+  if (e.which === 83 || e.which === 87) leftPaddle.dy = 0;
+});
+
+function togglePause() {
+  gamePaused = !gamePaused;
+  document.getElementById('settings').style.display = gamePaused ? 'block' : 'none';
+  if (!gamePaused) requestAnimationFrame(loop);
+}
+
+function resumeGame() {
+  togglePause();
+}
+</script>
+</body>
+</html>
