@@ -1,0 +1,2086 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TABOI games - blockblock</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #000;
+    }
+
+    canvas {
+      display: block;
+      position: relative;
+      z-index: 2;
+    }
+
+    #blocker {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      z-index: 20;
+    }
+
+    #instructions {
+      width: 50%;
+      background-color: #333;
+      color: white;
+      padding: 20px;
+      border-radius: 5px;
+      text-align: center;
+      font-family: sans-serif;
+      cursor: pointer;
+      border: 2px solid #555;
+    }
+
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      background-color: white;
+      border: 1px solid black;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      display: none;
+      mix-blend-mode: difference;
+      z-index: 15;
+    }
+
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: monospace;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 5px;
+      border-radius: 3px;
+      pointer-events: none;
+      font-size: 12px;
+      z-index: 10;
+    }
+
+    #blockInfo {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      color: white;
+      font-family: monospace;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 5px;
+      border-radius: 3px;
+      pointer-events: none;
+      font-size: 14px;
+      z-index: 10;
+    }
+
+    #blocker.error #instructions {
+      background-color: #fee;
+      color: #a00;
+      cursor: default;
+      border-color: #a00;
+    }
+
+    #stars {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 2s ease-in-out;
+      z-index: 1;
+    }
+  </style>
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+</head>
+
+<body>
+  <div id="stars"></div>
+  <div id="blocker">
+    <div id="instructions">
+      <img src="https://previews.dropbox.com/p/thumb/AClLVucfpXR8QSB-jSIM1uc6rq3oxRPG1AREDB5cNP6P0X3MYgNh2l8AiRUVS5wTAn8llCRiDQk5A4qjDkDQG3QbQDKtCGEFApepevaBklcOTKAKcpcgq-wzPIqlzwesInxodSyYqS42rGkzpnqmZGxvJreoKebCftrH1_X2hyOS3-bzfifWAeIWeJvhs7Si7L0-hKj6Z95Bm8Z32lrUB9hH6Go-wj0HQPnmcVcedg8wKJPE9yaCYJr-kzKkIgUBC0cnCIPVzfuQFFBbm-8jV6wRVBq8-dhGqnoLM6YRmVz183QuG-tDvNcuc0tj9sYywvpW1XcMyU1WHiUX6S_c_oNc/p.jpeg?is_prewarmed=true">
+      <h1>TABOI - Jogos<h1>
+          <h2>blockblock</h2>
+          Clique para jogar<br><br>
+          W, A, S, D = Mover<br>
+          ESPAÇO = Pular <br>
+          SHIFT = Abrir tela inicial<br>
+          MOUSE = Movimentar câmera <br>
+          BOTÃO ESQUERDO = Remover bloco<br>
+          BOTÃO DIREITO = Colocar bloco <br>
+          F = Ativar/Desativar modo voo<br>
+          1-9 = Selecionar tipo de bloco
+    </div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="info">Iniciando...</div>
+  <div id="blockInfo">Bloco: PEDRA</div>
+
+  <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+        }
+    }
+</script>
+  <script type="module">
+    import * as THREE from "https://esm.sh/three";
+    import {
+      PointerLockControls
+    } from "https://esm.sh/three/addons/controls/PointerLockControls.js";
+    // --- Configurações ---
+    const TAMANHO_CHUNK_X = 16;
+    const TAMANHO_CHUNK_Z = 16;
+    const TAMANHO_CHUNK_Y = 128;
+    const ALTURA_MUNDO = TAMANHO_CHUNK_Y;
+    // Tipos de blocos (agora com mais variedade)
+    const TIPO_BLOCO = {
+      AR: 0,
+      GRAMA: 1,
+      TERRA: 2,
+      PEDRA: 3,
+      MADEIRA: 4,
+      FOLHAS: 5,
+      AREIA: 6,
+      AGUA: 7,
+      NEVE: 8,
+      GELO: 9,
+      LADRILLO: 10,
+      PEDREGULHO: 11,
+      DIAMANTE: 12,
+      OURO: 13,
+      FERRO: 14,
+      CARVAO: 15
+    };
+    const NOMES_BLOCOS = {
+      0: 'AR',
+      1: 'GRAMA',
+      2: 'TERRA',
+      3: 'PEDRA',
+      4: 'MADEIRA',
+      5: 'FOLHAS',
+      6: 'AREIA',
+      7: 'AGUA',
+      8: 'NEVE',
+      9: 'GELO',
+      10: 'LADRILLO',
+      11: 'PEDREGULHO',
+      12: 'DIAMANTE',
+      13: 'OURO',
+      14: 'FERRO',
+      15: 'CARVAO'
+    };
+    const DISTANCIA_RENDER = 6;
+    const DISTANCIA_MAX_RAYCAST = 6;
+    const TAMANHO_TEXTURA = 32;
+    const CICLO_DIA_SEGUNDOS = 60 * 5;
+    // --- Estado do Jogo ---
+    let cena, camera, renderizador, controles, relogio, luzSol, luzLua, luzHemisfério;
+    let meshSol, meshLua, meshTocha, luzTocha, meshChama;
+    // Sistema de partículas
+    let sistemaParticulas, geometriaParticulas, materialParticulas;
+    let posicoesParticulas, velocidadesParticulas, temposVidaParticulas;
+    const contagemParticulas = 100;
+    const raioSpawnParticulas = 0.03;
+    const tempoBaseVidaParticula = 0.8;
+    const variacaoTempoVida = 0.3;
+    const gravidadeParticulas = 0.15;
+    const velocidadeBaseY = 0.2;
+    const variacaoVelocidade = 0.1;
+    const chunksMundo = new Map();
+    const meshesChunks = new Map();
+    const materiaisCarregados = {};
+    const cacheTexturas = {};
+    let tempoJogo = 0;
+    let divEstrelas;
+    const jogador = {
+      altura: 1.8,
+      raio: 0.4,
+      velocidade: 5.0,
+      velocidadeVoo: 10.0,
+      velocidadePulo: 7.0,
+      velocidadeAtual: new THREE.Vector3(),
+      direcao: new THREE.Vector3(),
+      noChao: false,
+      modoVoo: false,
+      chunkAtual: {
+        x: null,
+        z: null
+      },
+      posicao: new THREE.Vector3()
+    };
+    const gravidade = 22.0;
+    // Animação da tocha
+    let anguloBalancoTocha = 0;
+    const velocidadeBalanco = 0;
+    const quantidadeBalanco = 0.00;
+    const intensidadeBaseLuz = 10.0;
+    const quantidadeOscilacao = 0.4;
+    const velocidadeOscilacao = 15;
+    let moverFrente = false,
+      moverTras = false,
+      moverEsquerda = false,
+      moverDireita = false;
+    let moverCima = false,
+      moverBaixo = false;
+    let blocoParaColocar = TIPO_BLOCO.PEDRA;
+    const divInfo = document.getElementById('info');
+    const divInfoBloco = document.getElementById('blockInfo');
+    const raycaster = new THREE.Raycaster();
+    // --- Cores atmosféricas ---
+    const coresCeus = {
+      amanhecer: new THREE.Color(0xFFB370),
+      dia: new THREE.Color(0x87CEEB),
+      entardecer: new THREE.Color(0xFF9966),
+      noite: new THREE.Color(0x06061A)
+    };
+    const coresChao = {
+      amanhecer: new THREE.Color(0x99704D),
+      dia: new THREE.Color(0xB97A20),
+      entardecer: new THREE.Color(0xA35B3B),
+      noite: new THREE.Color(0x1A1A2A)
+    };
+    const coresLuzSol = {
+      amanhecer: new THREE.Color(0xFFDAA3),
+      dia: new THREE.Color(0xFFF8D6),
+      entardecer: new THREE.Color(0xFFB87A),
+      noite: new THREE.Color(0x000000)
+    };
+    const corLuzLua = new THREE.Color(0x7080B0);
+    // --- Funções de Ruído ---
+    const permutacaoRuido = new Uint8Array(512);
+    const inicializarRuido = () => {
+      const p = new Uint8Array(256);
+      for (let i = 0; i < 256; i++) p[i] = i;
+      for (let i = 255; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [p[i], p[j]] = [p[j], p[i]];
+      }
+      for (let i = 0; i < 256; i++) {
+        permutacaoRuido[i] = permutacaoRuido[i + 256] = p[i];
+      }
+    };
+    const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    const lerp = (t, a, b) => a + t * (b - a);
+    const ruidoValor2D = (x, y, escala = 0.1) => {
+      x *= escala;
+      y *= escala;
+      const X = Math.floor(x) & 255;
+      const Y = Math.floor(y) & 255;
+      x -= Math.floor(x);
+      y -= Math.floor(y);
+      const u = fade(x);
+      const v = fade(y);
+      const p = permutacaoRuido;
+      const A = p[X] + Y,
+        B = p[X + 1] + Y;
+      const h1 = p[p[A]];
+      const h2 = p[p[B]];
+      const h3 = p[p[A + 1]];
+      const h4 = p[p[B + 1]];
+      const n1 = lerp(u, h1 / 255, h2 / 255);
+      const n2 = lerp(u, h3 / 255, h4 / 255);
+      return (lerp(v, n1, n2) * 2) - 1;
+    };
+    const ruidoOctaves = (x, y, octaves = 4, persistencia = 0.5, lacunaridade = 2.0, escala = 0.02) => {
+      let total = 0;
+      let frequencia = 1.0;
+      let amplitude = 1.0;
+      let maxValor = 0;
+      for (let i = 0; i < octaves; i++) {
+        total += ruidoValor2D(x * frequencia, y * frequencia, escala) * amplitude;
+        maxValor += amplitude;
+        amplitude *= persistencia;
+        frequencia *= lacunaridade;
+      }
+      return total / maxValor;
+    };
+    // --- Inicialização ---
+    function inicializar() {
+      inicializarRuido();
+      divEstrelas = document.getElementById('stars');
+      criarEstrelas(200);
+      cena = new THREE.Scene();
+      cena.background = coresCeus.dia;
+      cena.fog = new THREE.Fog(coresCeus.dia, DISTANCIA_RENDER * TAMANHO_CHUNK_X * 0.4, DISTANCIA_RENDER * TAMANHO_CHUNK_X * 1.0);
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, DISTANCIA_RENDER * TAMANHO_CHUNK_X * 2.0);
+      camera.position.set(TAMANHO_CHUNK_X / 2, ALTURA_MUNDO * 0.5 + jogador.altura, TAMANHO_CHUNK_Z / 2);
+      renderizador = new THREE.WebGLRenderer({
+        antialias: true
+      });
+      renderizador.setPixelRatio(window.devicePixelRatio);
+      renderizador.setSize(window.innerWidth, window.innerHeight);
+      renderizador.outputColorSpace = THREE.SRGBColorSpace;
+      renderizador.shadowMap.enabled = true;
+      renderizador.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderizador.toneMapping = THREE.ACESFilmicToneMapping;
+      renderizador.toneMappingExposure = 1.0;
+      document.body.appendChild(renderizador.domElement);
+      relogio = new THREE.Clock();
+      // --- Iluminação ---
+      luzHemisfério = new THREE.HemisphereLight(coresCeus.dia, coresChao.dia, 0.8);
+      cena.add(luzHemisfério);
+      luzSol = new THREE.DirectionalLight(coresLuzSol.dia, 1.5);
+      luzSol.castShadow = true;
+      luzSol.shadow.mapSize.width = 2048;
+      luzSol.shadow.mapSize.height = 2048;
+      const tamanhoCamSombra = DISTANCIA_RENDER * TAMANHO_CHUNK_X * 1.0;
+      luzSol.shadow.camera.near = 0.5;
+      luzSol.shadow.camera.far = ALTURA_MUNDO + 250;
+      luzSol.shadow.camera.left = -tamanhoCamSombra;
+      luzSol.shadow.camera.right = tamanhoCamSombra;
+      luzSol.shadow.camera.top = tamanhoCamSombra;
+      luzSol.shadow.camera.bottom = -tamanhoCamSombra;
+      luzSol.shadow.bias = -0.001;
+      cena.add(luzSol);
+      cena.add(luzSol.target);
+      luzLua = new THREE.DirectionalLight(corLuzLua, 0.0);
+      luzLua.castShadow = false;
+      cena.add(luzLua);
+      cena.add(luzLua.target);
+      const geometriaSol = new THREE.SphereGeometry(15, 16, 16);
+      const materialSol = new THREE.MeshBasicMaterial({
+        color: 0xFFFF00,
+        fog: false
+      });
+      meshSol = new THREE.Mesh(geometriaSol, materialSol);
+      meshSol.name = "Sol";
+      cena.add(meshSol);
+      const geometriaLua = new THREE.SphereGeometry(12, 16, 16);
+      const materialLua = new THREE.MeshBasicMaterial({
+        color: 0xE0E0E0,
+        fog: false
+      });
+      meshLua = new THREE.Mesh(geometriaLua, materialLua);
+      meshLua.name = "Lua";
+      cena.add(meshLua);
+      configurarControles();
+      criarMateriaisProcedurais();
+      criarTocha();
+      console.log("Tocha e partículas criadas.");
+      atualizarChunksVisiveis(true);
+      jogador.posicao.copy(camera.position);
+      tempoJogo = 0.5;
+      atualizarAtmosfera(0);
+      animar();
+    }
+    // --- Criação de estrelas ---
+    function criarEstrelas(contagem) {
+      if (!divEstrelas) return;
+      divEstrelas.innerHTML = '';
+      for (let i = 0; i < contagem; i++) {
+        const estrela = document.createElement('div');
+        estrela.style.position = 'absolute';
+        const tamanho = Math.random() * 1.5 + 0.5;
+        estrela.style.width = `${tamanho}px`;
+        estrela.style.height = estrela.style.width;
+        estrela.style.backgroundColor = `rgba(255, 255, 255, ${Math.random() * 0.4 + 0.6})`;
+        estrela.style.borderRadius = '50%';
+        estrela.style.left = `${Math.random() * 100}%`;
+        estrela.style.top = `${Math.random() * 100}%`;
+        estrela.style.boxShadow = `0 0 ${Math.random() * 2 + 1}px rgba(255, 255, 255, 0.4)`;
+        divEstrelas.appendChild(estrela);
+      }
+    }
+    // --- Configuração de controles ---
+    function configurarControles() {
+      controles = new PointerLockControls(camera, document.body);
+      const bloqueador = document.getElementById('blocker');
+      const instrucoes = document.getElementById('instructions');
+      const mira = document.getElementById('crosshair');
+      instrucoes.addEventListener('click', () => {
+        if (!bloqueador.classList.contains('error')) controles.lock();
+      });
+      controles.addEventListener('lock', () => {
+        instrucoes.style.display = 'none';
+        bloqueador.style.display = 'none';
+        mira.style.display = 'block';
+      });
+      controles.addEventListener('unlock', () => {
+        bloqueador.style.display = 'flex';
+        instrucoes.style.display = '';
+        mira.style.display = 'none';
+        moverFrente = moverTras = moverEsquerda = moverDireita = moverCima = moverBaixo = false;
+      });
+      cena.add(controles.getObject());
+      document.addEventListener('keydown', aoPressionarTecla);
+      document.addEventListener('keyup', aoSoltarTecla);
+      document.addEventListener('mousedown', aoClicarMouse);
+      window.addEventListener('resize', aoRedimensionarJanela);
+    }
+    // --- Auxiliares para geração de texturas ---
+    function adicionarRuido(ctx, largura, altura, intensidade = 0.08, cores = ['rgba(0,0,0,0.05)', 'rgba(255,255,255,0.04)'], offsetX = 0, offsetY = 0, desenharLargura = largura, desenharAltura = altura) {
+      const numPixels = Math.floor(desenharLargura * desenharAltura * intensidade);
+      for (let i = 0; i < numPixels; i++) {
+        const x = offsetX + Math.random() * desenharLargura;
+        const y = offsetY + Math.random() * desenharAltura;
+        ctx.fillStyle = cores[Math.floor(Math.random() * cores.length)];
+        ctx.fillRect(Math.floor(x), Math.floor(y), 1, 1);
+      }
+    }
+
+    function variarCor(corHex, variacaoLuminosidade = 15, variacaoSaturacao = 0.01) {
+      let r = parseInt(corHex.slice(1, 3), 16);
+      let g = parseInt(corHex.slice(3, 5), 16);
+      let b = parseInt(corHex.slice(5, 7), 16);
+      const ajusteLuz = Math.floor((Math.random() - 0.5) * variacaoLuminosidade * 2);
+      r += ajusteLuz;
+      g += ajusteLuz;
+      b += ajusteLuz;
+      if (variacaoSaturacao > 0) {
+        const media = (r + g + b) / 3;
+        const ajusteSat = (Math.random() - 0.5) * variacaoSaturacao * 2;
+        const fator = Math.abs(ajusteSat);
+        if (ajusteSat > 0) {
+          r = lerp(fator, r, r + (r - media));
+          g = lerp(fator, g, g + (g - media));
+          b = lerp(fator, b, b + (b - media));
+        } else {
+          r = lerp(fator, r, media);
+          g = lerp(fator, g, media);
+          b = lerp(fator, b, media);
+        }
+      }
+      r = Math.max(0, Math.min(255, Math.round(r)));
+      g = Math.max(0, Math.min(255, Math.round(g)));
+      b = Math.max(0, Math.min(255, Math.round(b)));
+      return `rgb(${r},${g},${b})`;
+    }
+    // --- Geração de texturas procedurais ---
+    function gerarTexturaProcedural(tipoBloco, face = 'lado') {
+      const chaveCache = `${tipoBloco}_${face}_${TAMANHO_TEXTURA}`;
+      if (cacheTexturas[chaveCache]) return cacheTexturas[chaveCache];
+      const canvas = document.createElement('canvas');
+      canvas.width = TAMANHO_TEXTURA;
+      canvas.height = TAMANHO_TEXTURA;
+      const ctx = canvas.getContext('2d');
+      const T = TAMANHO_TEXTURA;
+      const P = T / 16;
+      const cores = {
+        grama_topo: '#78B846',
+        grama_topo_escuro: '#5E9C39',
+        grama_topo_claro: '#96D15F',
+        grama_lado_topo: '#90BB4F',
+        grama_lado_terra: '#806044',
+        terra: '#806044',
+        terra_escura: '#6A5139',
+        terra_clara: '#9A7656',
+        terra_pedrinha: '#59442F',
+        pedra: '#7F7F7F',
+        pedra_escura: '#6F6F6F',
+        pedra_clara: '#999999',
+        pedra_rachadura: '#555555',
+        madeira_topo: '#6F5A3A',
+        madeira_lado: '#645132',
+        madeira_escura: '#514228',
+        madeira_anel: '#4A3E26',
+        madeira_clara_grao: '#7A6441',
+        folhas: '#4C7F2E',
+        folhas_escuras: '#3A6323',
+        folhas_claras: '#67A53E',
+        folhas_buraco: 'rgba(0,0,0,0)',
+        areia: '#E5D8B0',
+        areia_escura: '#D2C08B',
+        areia_clara: '#F5E7C1',
+        agua: '#3A96DD',
+        agua_escura: '#2A7BB5',
+        agua_clara: '#4AB5F5',
+        neve: '#FFFFFF',
+        neve_suja: '#F0F0F0',
+        gelo: '#A5F2F3',
+        gelo_escuro: '#85D2D3',
+        ladrillo: '#B35939',
+        ladrillo_escuro: '#9C4A2B',
+        ladrillo_claro: '#CA6B4A',
+        pedregulho: '#8C8C8C',
+        pedregulho_escuro: '#7A7A7A',
+        diamante: '#4AECFF',
+        diamante_escuro: '#3ACBDF',
+        ouro: '#FFD700',
+        ouro_escuro: '#E5C100',
+        ferro: '#D8D8D8',
+        ferro_escuro: '#C0C0C0',
+        carvao: '#333333',
+        carvao_claro: '#4A4A4A'
+      };
+      switch (tipoBloco) {
+        case TIPO_BLOCO.GRAMA:
+          if (face === 'topo') {
+            ctx.fillStyle = cores.grama_topo;
+            ctx.fillRect(0, 0, T, T);
+            for (let i = 0; i < T * T * 0.5; i++) {
+              const x = Math.random() * T;
+              const y = Math.random() * T;
+              const w = Math.random() * P * 0.8 + P * 0.2;
+              const h = Math.random() * P * 2 + P * 0.5;
+              const angulo = (Math.random() - 0.5) * Math.PI * 0.3;
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.rotate(angulo);
+              ctx.fillStyle = Math.random() > 0.4 ? variarCor(cores.grama_topo_claro, 8, 0.01) : variarCor(cores.grama_topo_escuro, 8, 0.01);
+              ctx.fillRect(-w / 2, -h / 2, w, h);
+              ctx.restore();
+            }
+            for (let i = 0; i < T * T * 0.08; i++) {
+              ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.03)';
+              ctx.fillRect(Math.random() * T, Math.random() * T, P * 1.5, P * 1.5);
+            }
+            adicionarRuido(ctx, T, T, 0.08);
+          } else if (face === 'base') {
+            ctx.fillStyle = cores.terra;
+            ctx.fillRect(0, 0, T, T);
+            for (let i = 0; i < T * T * 0.12; i++) {
+              ctx.fillStyle = Math.random() > 0.5 ? variarCor(cores.terra_escura, 12) : variarCor(cores.terra_clara, 12);
+              ctx.fillRect(Math.random() * T, Math.random() * T, Math.random() * P * 1.8 + P * 0.8, Math.random() * P * 1.8 + P * 0.8);
+            }
+            for (let i = 0; i < T * T * 0.08; i++) {
+              ctx.fillStyle = variarCor(cores.terra_pedrinha, 5, 0);
+              ctx.fillRect(Math.random() * T, Math.random() * T, P * 0.5, P * 0.5);
+            }
+            adicionarRuido(ctx, T, T, 0.20);
+          } else {
+            const proporcaoTerra = 0.8;
+            const alturaTerraPx = Math.round(T * proporcaoTerra);
+            const alturaGramaPx = T - alturaTerraPx;
+            const alturaTransicaoPx = Math.max(P, alturaGramaPx * 0.4);
+            ctx.fillStyle = cores.grama_lado_terra;
+            ctx.fillRect(0, alturaGramaPx, T, alturaTerraPx);
+            for (let i = 0; i < T * alturaTerraPx * 0.08; i++) {
+              ctx.fillStyle = Math.random() > 0.5 ? variarCor(cores.terra_escura, 10) : variarCor(cores.terra_clara, 10);
+              ctx.fillRect(Math.random() * T, alturaGramaPx + Math.random() * alturaTerraPx, Math.random() * P * 1.5 + P * 0.5, Math.random() * P * 1.5 + P * 0.5);
+            }
+            adicionarRuido(ctx, T, T, 0.12, ['rgba(0,0,0,0.06)', 'rgba(255,255,255,0.03)'], 0, alturaGramaPx, T, alturaTerraPx);
+            ctx.fillStyle = cores.grama_lado_topo;
+            ctx.fillRect(0, 0, T, alturaGramaPx);
+            for (let i = 0; i < T * 0.8; i++) {
+              const inicioX = Math.random() * T;
+              const inicioY = alturaGramaPx - alturaTransicaoPx * Math.random() * 0.5;
+              const comprimento = alturaTransicaoPx * (1 + Math.random() * 1.2);
+              const largura = Math.max(1, P * (0.2 + Math.random() * 0.4));
+              ctx.fillStyle = variarCor(cores.grama_lado_topo, Math.random() > 0.3 ? -12 : 8);
+              ctx.fillRect(inicioX - largura / 2, inicioY, largura, comprimento);
+              ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)';
+              ctx.fillRect(inicioX - largura / 2, inicioY, largura * 0.5, comprimento);
+            }
+            adicionarRuido(ctx, T, T, 0.08, ['rgba(0,0,0,0.05)', 'rgba(255,255,255,0.04)'], 0, 0, T, alturaGramaPx);
+          }
+          break;
+        case TIPO_BLOCO.TERRA:
+          ctx.fillStyle = cores.terra;
+          ctx.fillRect(0, 0, T, T);
+          for (let i = 0; i < T * T * 0.12; i++) {
+            ctx.fillStyle = Math.random() > 0.5 ? variarCor(cores.terra_escura, 12) : variarCor(cores.terra_clara, 12);
+            ctx.fillRect(Math.random() * T, Math.random() * T, Math.random() * P * 1.8 + P * 0.8, Math.random() * P * 1.8 + P * 0.8);
+          }
+          for (let i = 0; i < T * T * 0.08; i++) {
+            ctx.fillStyle = variarCor(cores.terra_pedrinha, 5, 0);
+            ctx.fillRect(Math.random() * T, Math.random() * T, P * (0.5 + Math.random() * 0.5), P * (0.5 + Math.random() * 0.5));
+          }
+          adicionarRuido(ctx, T, T, 0.20);
+          break;
+        case TIPO_BLOCO.PEDRA:
+          ctx.fillStyle = cores.pedra_clara;
+          ctx.fillRect(0, 0, T, T);
+          for (let i = 0; i < T * T * 0.18; i++) {
+            ctx.fillStyle = variarCor(cores.pedra_escura, 8);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = Math.random() * P * 2.0 + P * 0.7;
+            ctx.fillRect(x, y, tamanho, tamanho);
+          }
+          for (let i = 0; i < T * T * 0.22; i++) {
+            ctx.fillStyle = variarCor(cores.pedra, 12);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = Math.random() * P * 1.8 + P * 0.5;
+            ctx.fillRect(x, y, tamanho, tamanho);
+          }
+          ctx.strokeStyle = cores.pedra_rachadura;
+          ctx.lineWidth = Math.max(1, P * 0.2);
+          for (let i = 0; i < T / 10; i++) {
+            ctx.beginPath();
+            const inicioX = Math.random() * T;
+            const inicioY = Math.random() * T;
+            ctx.moveTo(inicioX, inicioY);
+            const comprimento = P * (1.5 + Math.random() * 3);
+            const angulo = Math.random() * Math.PI * 2;
+            const fimX = inicioX + Math.cos(angulo) * comprimento;
+            const fimY = inicioY + Math.sin(angulo) * comprimento;
+            ctx.lineTo(fimX + (Math.random() - 0.5) * P * 0.8, fimY + (Math.random() - 0.5) * P * 0.8);
+            ctx.stroke();
+          }
+          adicionarRuido(ctx, T, T, 0.12);
+          break;
+        case TIPO_BLOCO.MADEIRA:
+          if (face === 'topo' || face === 'base') {
+            ctx.fillStyle = cores.madeira_topo;
+            ctx.fillRect(0, 0, T, T);
+            ctx.strokeStyle = cores.madeira_anel;
+            const centroX = T / 2 + (Math.random() - 0.5) * P * 1.5;
+            const centroY = T / 2 + (Math.random() - 0.5) * P * 1.5;
+            const raioMax = T * 0.45;
+            let passoAnel = Math.max(2, P * (0.8 + Math.random() * 0.4));
+            for (let r = passoAnel * (0.5 + Math.random() * 0.5); r < raioMax; r += passoAnel * (0.7 + Math.random() * 0.6)) {
+              ctx.lineWidth = Math.max(1, P * (0.2 + Math.random() * 0.6));
+              ctx.beginPath();
+              const segmentos = 12;
+              let primeiroX, primeiroY;
+              for (let seg = 0; seg <= segmentos; seg++) {
+                const angulo = (seg / segmentos) * Math.PI * 2;
+                const raioX = r * (0.95 + Math.random() * 0.1);
+                const raioY = r * (0.95 + Math.random() * 0.1);
+                const offsetAngulo = (Math.random() - 0.5) * 0.1;
+                const x = centroX + Math.cos(angulo + offsetAngulo) * raioX;
+                const y = centroY + Math.sin(angulo + offsetAngulo) * raioY;
+                if (seg === 0) {
+                  ctx.moveTo(x, y);
+                  primeiroX = x;
+                  primeiroY = y;
+                } else if (seg === segmentos) {
+                  ctx.lineTo(primeiroX, primeiroY);
+                } else {
+                  ctx.lineTo(x, y);
+                }
+              }
+              ctx.stroke();
+              passoAnel = Math.max(2, P * (0.8 + Math.random() * 0.4));
+            }
+            adicionarRuido(ctx, T, T, 0.08);
+          } else {
+            ctx.fillStyle = cores.madeira_lado;
+            ctx.fillRect(0, 0, T, T);
+            ctx.lineWidth = Math.max(1, P * 0.3);
+            const linhasGrao = T / 2.5;
+            for (let i = 0; i < linhasGrao; i++) {
+              ctx.strokeStyle = variarCor(cores.madeira_escura, 8, 0.02);
+              ctx.lineWidth = Math.max(1, P * (0.2 + Math.random() * 0.5));
+              ctx.beginPath();
+              let x = (i / linhasGrao + Math.random() * 0.2 / linhasGrao) * T;
+              ctx.moveTo(x + (Math.random() - 0.5) * P * 0.5, 0);
+              for (let y = P; y <= T; y += P * (1.5 + Math.random())) {
+                ctx.lineTo(x + (Math.random() - 0.5) * P, y);
+              }
+              ctx.stroke();
+              if (Math.random() > 0.4) {
+                ctx.strokeStyle = variarCor(cores.madeira_clara_grao, 5, 0.01);
+                ctx.lineWidth = Math.max(1, P * (0.1 + Math.random() * 0.3));
+                ctx.beginPath();
+                let x2 = x + (Math.random() - 0.5) * P * 0.8;
+                ctx.moveTo(x2 + (Math.random() - 0.5) * P * 0.3, 0);
+                for (let y = P; y <= T; y += P * (2 + Math.random())) {
+                  ctx.lineTo(x2 + (Math.random() - 0.5) * P * 0.8, y);
+                }
+                ctx.stroke();
+              }
+            }
+            if (Math.random() < 0.08) {
+              const noX = Math.random() * T * 0.8 + T * 0.1;
+              const noY = Math.random() * T * 0.8 + T * 0.1;
+              const raioNo = P * (0.8 + Math.random() * 1.2);
+              ctx.fillStyle = variarCor(cores.madeira_escura, -10);
+              ctx.beginPath();
+              ctx.ellipse(noX, noY, raioNo, raioNo * (0.6 + Math.random() * 0.3), Math.random() * Math.PI, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = variarCor(cores.madeira_anel, -5);
+              ctx.beginPath();
+              ctx.ellipse(noX, noY, raioNo * 0.4, raioNo * 0.2, Math.random() * Math.PI, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            adicionarRuido(ctx, T, T, 0.08, ['rgba(0,0,0,0.08)', 'rgba(255,255,255,0.03)']);
+          }
+          break;
+        case TIPO_BLOCO.FOLHAS:
+          ctx.fillStyle = cores.folhas;
+          ctx.fillRect(0, 0, T, T);
+          const contagemFolhas = T * T * 1.2;
+          for (let i = 0; i < contagemFolhas; i++) {
+            let cor;
+            const randCor = Math.random();
+            if (randCor < 0.4) cor = variarCor(cores.folhas_claras, 8, 0.01);
+            else if (randCor < 0.75) cor = variarCor(cores.folhas, 8, 0.01);
+            else cor = variarCor(cores.folhas_escuras, 6, 0.01);
+            ctx.fillStyle = cor;
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const raioX = Math.random() * (P * 0.8) + (P * 0.3);
+            const raioY = Math.random() * (P * 0.8) + (P * 0.3);
+            const angulo = Math.random() * Math.PI;
+            ctx.beginPath();
+            ctx.ellipse(x, y, raioX, raioY, angulo, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalCompositeOperation = 'destination-out';
+          const contagemBuracos = T * T * 0.06;
+          for (let i = 0; i < contagemBuracos; i++) {
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const raio = Math.random() * (P * 0.5) + (P * 0.2);
+            ctx.beginPath();
+            ctx.arc(x, y, raio, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalCompositeOperation = 'source-over';
+          adicionarRuido(ctx, T, T, 0.12, [variarCor(cores.folhas_escuras, -10, 0)]);
+          break;
+        case TIPO_BLOCO.AREIA:
+          ctx.fillStyle = cores.areia;
+          ctx.fillRect(0, 0, T, T);
+          for (let i = 0; i < T * T * 0.15; i++) {
+            ctx.fillStyle = Math.random() > 0.5 ? variarCor(cores.areia_escura, 8) : variarCor(cores.areia_clara, 8);
+            ctx.fillRect(Math.random() * T, Math.random() * T, Math.random() * P * 1.5 + P * 0.5, Math.random() * P * 1.5 + P * 0.5);
+          }
+          for (let i = 0; i < T * T * 0.05; i++) {
+            ctx.fillStyle = variarCor('#8B7D6B', 10);
+            ctx.fillRect(Math.random() * T, Math.random() * T, P * 0.3, P * 0.3);
+          }
+          adicionarRuido(ctx, T, T, 0.15);
+          break;
+        case TIPO_BLOCO.AGUA:
+          ctx.fillStyle = cores.agua;
+          ctx.fillRect(0, 0, T, T);
+          // Ondas
+          for (let i = 0; i < T * 0.5; i++) {
+            ctx.strokeStyle = variarCor(cores.agua_clara, 5);
+            ctx.lineWidth = Math.max(1, P * 0.2);
+            ctx.beginPath();
+            const y = Math.random() * T;
+            const amplitude = P * (0.2 + Math.random() * 0.3);
+            const comprimentoOnda = P * (2 + Math.random() * 3);
+            for (let x = 0; x <= T; x += P) {
+              const offsetY = Math.sin(x / comprimentoOnda) * amplitude;
+              if (x === 0) ctx.moveTo(x, y + offsetY);
+              else ctx.lineTo(x, y + offsetY);
+            }
+            ctx.stroke();
+          }
+          // Reflexos
+          for (let i = 0; i < T * T * 0.02; i++) {
+            ctx.fillStyle = variarCor(cores.agua_clara, 10);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = P * (0.3 + Math.random() * 0.5);
+            ctx.fillRect(x, y, tamanho, tamanho * 0.3);
+          }
+          break;
+        case TIPO_BLOCO.NEVE:
+          ctx.fillStyle = cores.neve;
+          ctx.fillRect(0, 0, T, T);
+          // Flocos de neve
+          for (let i = 0; i < T * T * 0.1; i++) {
+            ctx.fillStyle = variarCor(cores.neve_suja, 5);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = P * (0.2 + Math.random() * 0.3);
+            ctx.beginPath();
+            ctx.arc(x, y, tamanho, 0, Math.PI * 2);
+            ctx.fill();
+            // Adicionar detalhes ao floco
+            if (Math.random() > 0.7) {
+              ctx.strokeStyle = variarCor(cores.neve, 2);
+              ctx.lineWidth = Math.max(1, P * 0.1);
+              ctx.beginPath();
+              for (let j = 0; j < 6; j++) {
+                const angulo = (j / 6) * Math.PI * 2;
+                const raio = tamanho * 0.8;
+                const raioPonta = tamanho * 1.5;
+                ctx.moveTo(x, y);
+                ctx.lineTo(
+                  x + Math.cos(angulo) * raioPonta,
+                  y + Math.sin(angulo) * raioPonta
+                );
+              }
+              ctx.stroke();
+            }
+          }
+          break;
+        case TIPO_BLOCO.GELO:
+          ctx.fillStyle = cores.gelo;
+          ctx.fillRect(0, 0, T, T);
+          // Rachaduras
+          ctx.strokeStyle = cores.gelo_escuro;
+          ctx.lineWidth = Math.max(1, P * 0.2);
+          for (let i = 0; i < T / 8; i++) {
+            ctx.beginPath();
+            const inicioX = Math.random() * T;
+            const inicioY = Math.random() * T;
+            ctx.moveTo(inicioX, inicioY);
+            const segmentos = 3 + Math.floor(Math.random() * 3);
+            for (let j = 0; j < segmentos; j++) {
+              const comprimento = P * (1 + Math.random() * 2);
+              const angulo = Math.random() * Math.PI * 2;
+              ctx.lineTo(
+                inicioX + Math.cos(angulo) * comprimento,
+                inicioY + Math.sin(angulo) * comprimento
+              );
+            }
+            ctx.stroke();
+          }
+          // Reflexos
+          for (let i = 0; i < T * T * 0.03; i++) {
+            ctx.fillStyle = variarCor(cores.gelo, 10);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = P * (0.3 + Math.random() * 0.5);
+            ctx.fillRect(x, y, tamanho, tamanho * 0.2);
+          }
+          break;
+        case TIPO_BLOCO.LADRILLO:
+          ctx.fillStyle = cores.ladrillo;
+          ctx.fillRect(0, 0, T, T);
+          // Padrão de tijolos
+          const alturaTijolo = P * 2.2;
+          const larguraTijolo = P * 4.5;
+          const espessuraArgamassa = Math.max(1, P * 0.3);
+          // Argamassa horizontal
+          ctx.fillStyle = variarCor(cores.ladrillo_escuro, 5);
+          for (let y = 0; y < T; y += alturaTijolo + espessuraArgamassa) {
+            ctx.fillRect(0, y, T, espessuraArgamassa);
+          }
+          // Argamassa vertical (padrão deslocado)
+          for (let y = 0; y < T; y += alturaTijolo + espessuraArgamassa) {
+            const offset = (y / (alturaTijolo + espessuraArgamassa)) % 2 === 0 ? 0 : larguraTijolo / 2;
+            for (let x = offset; x < T; x += larguraTijolo) {
+              ctx.fillRect(x, y, espessuraArgamassa, alturaTijolo);
+            }
+          }
+          // Textura dos tijolos
+          for (let y = 0; y < T; y += alturaTijolo + espessuraArgamassa) {
+            const offset = (y / (alturaTijolo + espessuraArgamassa)) % 2 === 0 ? 0 : larguraTijolo / 2;
+            for (let x = offset; x < T; x += larguraTijolo) {
+              ctx.fillStyle = variarCor(cores.ladrillo, 8);
+              ctx.fillRect(
+                x + espessuraArgamassa,
+                y + espessuraArgamassa,
+                larguraTijolo - espessuraArgamassa,
+                alturaTijolo - espessuraArgamassa
+              );
+              // Detalhes nos tijolos
+              if (Math.random() > 0.3) {
+                ctx.fillStyle = variarCor(cores.ladrillo_escuro, 10);
+                ctx.fillRect(
+                  x + espessuraArgamassa + Math.random() * (larguraTijolo - espessuraArgamassa * 3),
+                  y + espessuraArgamassa + Math.random() * (alturaTijolo - espessuraArgamassa * 3),
+                  P * 0.5,
+                  P * 0.5
+                );
+              }
+            }
+          }
+          break;
+        case TIPO_BLOCO.PEDREGULHO:
+          ctx.fillStyle = cores.pedregulho;
+          ctx.fillRect(0, 0, T, T);
+          for (let i = 0; i < T * T * 0.15; i++) {
+            ctx.fillStyle = Math.random() > 0.5 ? variarCor(cores.pedregulho_escuro, 8) : variarCor('#A5A5A5', 8);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = Math.random() * P * 1.2 + P * 0.3;
+            ctx.beginPath();
+            ctx.arc(x, y, tamanho, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // Detalhes
+          for (let i = 0; i < T * T * 0.05; i++) {
+            ctx.fillStyle = variarCor('#5A5A5A', 5);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = P * 0.2;
+            ctx.fillRect(x, y, tamanho, tamanho);
+          }
+          break;
+        case TIPO_BLOCO.DIAMANTE:
+          ctx.fillStyle = cores.diamante;
+          ctx.fillRect(0, 0, T, T);
+          // Padrão de cristal
+          const tamanhoCristal = P * 3;
+          for (let y = 0; y < T + tamanhoCristal; y += tamanhoCristal * 0.8) {
+            for (let x = 0; x < T + tamanhoCristal; x += tamanhoCristal) {
+              const offset = (y / (tamanhoCristal * 0.8)) % 2 === 0 ? 0 : tamanhoCristal / 2;
+              ctx.fillStyle = variarCor(cores.diamante, 5);
+              ctx.beginPath();
+              ctx.moveTo(x - offset, y);
+              ctx.lineTo(x - offset + tamanhoCristal * 0.5, y - tamanhoCristal * 0.3);
+              ctx.lineTo(x - offset + tamanhoCristal, y);
+              ctx.lineTo(x - offset + tamanhoCristal * 0.5, y + tamanhoCristal * 0.3);
+              ctx.closePath();
+              ctx.fill();
+              // Brilho
+              ctx.fillStyle = variarCor(cores.diamante_escuro, -20);
+              ctx.beginPath();
+              ctx.moveTo(x - offset + tamanhoCristal * 0.3, y - tamanhoCristal * 0.1);
+              ctx.lineTo(x - offset + tamanhoCristal * 0.4, y - tamanhoCristal * 0.15);
+              ctx.lineTo(x - offset + tamanhoCristal * 0.7, y - tamanhoCristal * 0.05);
+              ctx.lineTo(x - offset + tamanhoCristal * 0.6, y + tamanhoCristal * 0.05);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+          break;
+        case TIPO_BLOCO.OURO:
+          ctx.fillStyle = cores.ouro;
+          ctx.fillRect(0, 0, T, T);
+          // Padrão de veios
+          for (let i = 0; i < T * 1.5; i++) {
+            ctx.strokeStyle = variarCor(cores.ouro_escuro, 5);
+            ctx.lineWidth = Math.max(1, P * 0.3);
+            ctx.beginPath();
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const comprimento = P * (2 + Math.random() * 3);
+            const angulo = Math.random() * Math.PI * 2;
+            ctx.moveTo(x, y);
+            ctx.lineTo(
+              x + Math.cos(angulo) * comprimento,
+              y + Math.sin(angulo) * comprimento
+            );
+            ctx.stroke();
+          }
+          // Manchas
+          for (let i = 0; i < T * T * 0.05; i++) {
+            ctx.fillStyle = variarCor(cores.ouro_escuro, 8);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = P * (0.5 + Math.random() * 1.0);
+            ctx.beginPath();
+            ctx.arc(x, y, tamanho, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          break;
+        case TIPO_BLOCO.FERRO:
+          ctx.fillStyle = cores.ferro;
+          ctx.fillRect(0, 0, T, T);
+          // Textura metálica
+          for (let i = 0; i < T * T * 0.2; i++) {
+            ctx.fillStyle = Math.random() > 0.5 ? variarCor(cores.ferro_escuro, 5) : variarCor('#E0E0E0', 5);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = P * (0.3 + Math.random() * 0.7);
+            ctx.fillRect(x, y, tamanho, tamanho);
+          }
+          // Marcas de ferrugem
+          if (Math.random() > 0.7) {
+            for (let i = 0; i < T * T * 0.03; i++) {
+              ctx.fillStyle = variarCor('#B7410E', 10);
+              const x = Math.random() * T;
+              const y = Math.random() * T;
+              const tamanho = P * (0.5 + Math.random() * 1.0);
+              ctx.beginPath();
+              ctx.arc(x, y, tamanho, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          break;
+        case TIPO_BLOCO.CARVAO:
+          ctx.fillStyle = cores.carvao;
+          ctx.fillRect(0, 0, T, T);
+          // Veios de carvão
+          for (let i = 0; i < T * T * 0.1; i++) {
+            ctx.fillStyle = variarCor(cores.carvao_claro, 8);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanhoX = P * (0.5 + Math.random() * 2.0);
+            const tamanhoY = P * (0.2 + Math.random() * 0.5);
+            ctx.fillRect(x, y, tamanhoX, tamanhoY);
+          }
+          // Pedaços brilhantes
+          for (let i = 0; i < T * T * 0.02; i++) {
+            ctx.fillStyle = variarCor('#5A5A5A', 15);
+            const x = Math.random() * T;
+            const y = Math.random() * T;
+            const tamanho = P * 0.3;
+            ctx.beginPath();
+            ctx.arc(x, y, tamanho, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          break;
+        default:
+          ctx.fillStyle = '#FF00FF';
+          ctx.fillRect(0, 0, T, T);
+          ctx.fillStyle = '#000000';
+          ctx.font = `${T/4}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('?', T / 2, T / 2);
+          break;
+      }
+      const textura = new THREE.CanvasTexture(canvas);
+      textura.magFilter = THREE.NearestFilter;
+      textura.minFilter = THREE.NearestMipmapLinearFilter;
+      textura.colorSpace = THREE.SRGBColorSpace;
+      textura.needsUpdate = true;
+      cacheTexturas[chaveCache] = textura;
+      return textura;
+    }
+    // --- Criação de materiais ---
+    function criarMateriaisProcedurais() {
+      const PBRPadrao = {
+        roughness: 0.9,
+        metalness: 0.05
+      };
+      const PBRFolhas = {
+        roughness: 0.8,
+        metalness: 0.0
+      };
+      const PBRMadeira = {
+        roughness: 0.85,
+        metalness: 0.0
+      };
+      const PBRPedra = {
+        roughness: 0.75,
+        metalness: 0.1
+      };
+      const PBRMetal = {
+        roughness: 0.3,
+        metalness: 0.9
+      };
+      const PBRMineral = {
+        roughness: 0.4,
+        metalness: 0.7
+      };
+      const PBRGelo = {
+        roughness: 0.1,
+        metalness: 0.3
+      };
+      const PBRAgua = {
+        roughness: 0.0,
+        metalness: 0.1
+      };
+      const materialPadrao = new THREE.MeshStandardMaterial({
+        color: 0xff00ff,
+        ...PBRPadrao
+      });
+      for (const tipo of Object.values(TIPO_BLOCO)) {
+        if (tipo === TIPO_BLOCO.AR) continue;
+        const ehTransparente = (tipo === TIPO_BLOCO.FOLHAS || tipo === TIPO_BLOCO.AGUA);
+        const precisaAlphaTest = ehTransparente;
+        let propriedadesPBR;
+        let materialMultiplo = false;
+        switch (tipo) {
+          case TIPO_BLOCO.FOLHAS:
+            propriedadesPBR = PBRFolhas;
+            break;
+          case TIPO_BLOCO.MADEIRA:
+            propriedadesPBR = PBRMadeira;
+            materialMultiplo = true;
+            break;
+          case TIPO_BLOCO.PEDRA:
+          case TIPO_BLOCO.PEDREGULHO:
+          case TIPO_BLOCO.LADRILLO:
+            propriedadesPBR = PBRPedra;
+            break;
+          case TIPO_BLOCO.GRAMA:
+            propriedadesPBR = PBRPadrao;
+            materialMultiplo = true;
+            break;
+          case TIPO_BLOCO.AREIA:
+          case TIPO_BLOCO.NEVE:
+            propriedadesPBR = PBRPadrao;
+            break;
+          case TIPO_BLOCO.GELO:
+            propriedadesPBR = PBRGelo;
+            break;
+          case TIPO_BLOCO.AGUA:
+            propriedadesPBR = PBRAgua;
+            break;
+          case TIPO_BLOCO.OURO:
+          case TIPO_BLOCO.FERRO:
+            propriedadesPBR = PBRMetal;
+            break;
+          case TIPO_BLOCO.DIAMANTE:
+          case TIPO_BLOCO.CARVAO:
+            propriedadesPBR = PBRMineral;
+            break;
+          default:
+            propriedadesPBR = PBRPadrao;
+            break;
+        }
+        try {
+          if (materialMultiplo) {
+            const texturaTopo = gerarTexturaProcedural(tipo, 'topo');
+            const texturaBase = gerarTexturaProcedural(tipo, (tipo === TIPO_BLOCO.GRAMA ? 'base' : 'topo'));
+            const texturaLado = gerarTexturaProcedural(tipo, 'lado');
+            materiaisCarregados[tipo] = [
+              new THREE.MeshStandardMaterial({
+                map: texturaLado,
+                name: `${NOMES_BLOCOS[tipo]}_px`,
+                ...propriedadesPBR
+              }),
+              new THREE.MeshStandardMaterial({
+                map: texturaLado,
+                name: `${NOMES_BLOCOS[tipo]}_nx`,
+                ...propriedadesPBR
+              }),
+              new THREE.MeshStandardMaterial({
+                map: texturaTopo,
+                name: `${NOMES_BLOCOS[tipo]}_py`,
+                ...propriedadesPBR
+              }),
+              new THREE.MeshStandardMaterial({
+                map: texturaBase,
+                name: `${NOMES_BLOCOS[tipo]}_ny`,
+                ...propriedadesPBR
+              }),
+              new THREE.MeshStandardMaterial({
+                map: texturaLado,
+                name: `${NOMES_BLOCOS[tipo]}_pz`,
+                ...propriedadesPBR
+              }),
+              new THREE.MeshStandardMaterial({
+                map: texturaLado,
+                name: `${NOMES_BLOCOS[tipo]}_nz`,
+                ...propriedadesPBR
+              })
+            ];
+            materiaisCarregados[tipo].forEach(mat => mat.needsUpdate = true);
+          } else {
+            const textura = gerarTexturaProcedural(tipo, 'lado');
+            materiaisCarregados[tipo] = new THREE.MeshStandardMaterial({
+              map: textura,
+              transparent: ehTransparente,
+              alphaTest: precisaAlphaTest ? 0.1 : 0,
+              side: ehTransparente ? THREE.DoubleSide : THREE.FrontSide,
+              name: `${NOMES_BLOCOS[tipo]}`,
+              ...propriedadesPBR
+            });
+            materiaisCarregados[tipo].needsUpdate = true;
+          }
+        } catch (erro) {
+          console.error(`Falha ao criar material para bloco tipo ${tipo} (${NOMES_BLOCOS[tipo]}):`, erro);
+          materiaisCarregados[tipo] = materialPadrao;
+        }
+      }
+      for (const tipo of Object.values(TIPO_BLOCO)) {
+        if (tipo !== TIPO_BLOCO.AR && !materiaisCarregados[tipo]) {
+          console.warn(`Material faltando para bloco tipo ${tipo} (${NOMES_BLOCOS[tipo]}). Usando fallback.`);
+          materiaisCarregados[tipo] = materialPadrao;
+        }
+      }
+    }
+    // --- Criação da tocha ---
+    function criarTocha() {
+      meshTocha = new THREE.Group();
+      meshTocha.name = "ModeloTocha";
+      let materialCabeca = materiaisCarregados[TIPO_BLOCO.MADEIRA];
+      if (!materialCabeca || !Array.isArray(materialCabeca)) {
+        console.warn("Material de madeira para tocha não encontrado! Usando fallback.");
+        materialCabeca = new THREE.MeshStandardMaterial({
+          color: 0x8B4513,
+          roughness: 0.8
+        });
+      } else {
+        materialCabeca = materialCabeca[0];
+      }
+      const materialChama = new THREE.MeshBasicMaterial({
+        color: 0xFFA500,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const alturaCabeca = 0.5;
+      const raioCabeca = 0.04;
+      const raioChama = 0.05;
+      const geometriaCabeca = new THREE.CylinderGeometry(raioCabeca, raioCabeca * 0.8, alturaCabeca, 8);
+      const meshCabeca = new THREE.Mesh(geometriaCabeca, materialCabeca);
+      meshCabeca.position.y = -alturaCabeca * 0.4;
+      meshTocha.add(meshCabeca);
+      const geometriaChama = new THREE.SphereGeometry(raioChama, 8, 6);
+      meshChama = new THREE.Mesh(geometriaChama, materialChama);
+      const baseYChama = meshCabeca.position.y + alturaCabeca / 2 + raioChama * 0.1;
+      meshChama.position.y = baseYChama + raioChama * 0.5;
+      meshTocha.add(meshChama);
+      luzTocha = new THREE.PointLight(0xffaa33, intensidadeBaseLuz, 7, 2);
+      luzTocha.position.copy(meshChama.position);
+      luzTocha.castShadow = false;
+      meshTocha.add(luzTocha);
+      geometriaParticulas = new THREE.BufferGeometry();
+      posicoesParticulas = new Float32Array(contagemParticulas * 3);
+      velocidadesParticulas = [];
+      temposVidaParticulas = new Float32Array(contagemParticulas);
+      const origemChama = new THREE.Vector3(0, baseYChama, 0);
+      for (let i = 0; i < contagemParticulas; i++) {
+        const i3 = i * 3;
+        posicoesParticulas[i3] = origemChama.x + (Math.random() - 0.5) * raioSpawnParticulas * 2;
+        posicoesParticulas[i3 + 1] = origemChama.y + Math.random() * 0.05;
+        posicoesParticulas[i3 + 2] = origemChama.z + (Math.random() - 0.5) * raioSpawnParticulas * 2;
+        const vel = new THREE.Vector3(
+          (Math.random() - 0.5) * variacaoVelocidade * 0.5,
+          velocidadeBaseY + Math.random() * variacaoVelocidade,
+          (Math.random() - 0.5) * variacaoVelocidade * 0.5
+        );
+        velocidadesParticulas.push(vel);
+        temposVidaParticulas[i] = tempoBaseVidaParticula + (Math.random() - 0.5) * variacaoTempoVida * 2;
+      }
+      geometriaParticulas.setAttribute('position', new THREE.BufferAttribute(posicoesParticulas, 3));
+      materialParticulas = new THREE.PointsMaterial({
+        color: 0xffcc66,
+        size: 0.015,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+        sizeAttenuation: true
+      });
+      sistemaParticulas = new THREE.Points(geometriaParticulas, materialParticulas);
+      sistemaParticulas.name = "ParticulasTocha";
+      meshTocha.add(sistemaParticulas);
+      meshTocha.position.set(0.30, -0.25, -0.45);
+      meshTocha.rotation.set(0, -Math.PI / 16, Math.PI / 14);
+      camera.add(meshTocha);
+    }
+    // --- Gerenciamento de mundo e chunks ---
+    function obterCoordsChunk(mundoX, mundoZ) {
+      return {
+        x: Math.floor(mundoX / TAMANHO_CHUNK_X),
+        z: Math.floor(mundoZ / TAMANHO_CHUNK_Z)
+      };
+    }
+
+    function obterChaveChunk(chunkX, chunkZ) {
+      return `${chunkX},${chunkZ}`;
+    }
+
+    function obterBlocoMundo(mundoX, mundoY, mundoZ) {
+      const {
+        x: chunkX,
+        z: chunkZ
+      } = obterCoordsChunk(mundoX, mundoZ);
+      const chave = obterChaveChunk(chunkX, chunkZ);
+      const dadosChunk = chunksMundo.get(chave);
+      if (!dadosChunk || mundoY < 0 || mundoY >= TAMANHO_CHUNK_Y) return TIPO_BLOCO.AR;
+      const localX = THREE.MathUtils.euclideanModulo(Math.floor(mundoX), TAMANHO_CHUNK_X);
+      const localZ = THREE.MathUtils.euclideanModulo(Math.floor(mundoZ), TAMANHO_CHUNK_Z);
+      const localY = Math.floor(mundoY);
+      return dadosChunk[localX]?.[localZ]?.[localY] ?? TIPO_BLOCO.AR;
+    }
+
+    function definirBlocoMundo(mundoX, mundoY, mundoZ, tipoBloco) {
+      const {
+        x: chunkX,
+        z: chunkZ
+      } = obterCoordsChunk(mundoX, mundoZ);
+      const chave = obterChaveChunk(chunkX, chunkZ);
+      let dadosChunk = chunksMundo.get(chave);
+      if (!dadosChunk || mundoY < 0 || mundoY >= TAMANHO_CHUNK_Y) return;
+      const localX = THREE.MathUtils.euclideanModulo(Math.floor(mundoX), TAMANHO_CHUNK_X);
+      const localZ = THREE.MathUtils.euclideanModulo(Math.floor(mundoZ), TAMANHO_CHUNK_Z);
+      const localY = Math.floor(mundoY);
+      if (!dadosChunk[localX]) dadosChunk[localX] = [];
+      if (!dadosChunk[localX][localZ]) dadosChunk[localX][localZ] = new Uint8Array(TAMANHO_CHUNK_Y).fill(TIPO_BLOCO.AR);
+      if (dadosChunk[localX][localZ][localY] !== tipoBloco) {
+        dadosChunk[localX][localZ][localY] = tipoBloco;
+        descartarMeshChunk(chunkX, chunkZ);
+        criarMeshChunk(chunkX, chunkZ);
+        const vizinhosParaAtualizar = [];
+        if (localX === 0) vizinhosParaAtualizar.push({
+          x: chunkX - 1,
+          z: chunkZ
+        });
+        else if (localX === TAMANHO_CHUNK_X - 1) vizinhosParaAtualizar.push({
+          x: chunkX + 1,
+          z: chunkZ
+        });
+        if (localZ === 0) vizinhosParaAtualizar.push({
+          x: chunkX,
+          z: chunkZ - 1
+        });
+        else if (localZ === TAMANHO_CHUNK_Z - 1) vizinhosParaAtualizar.push({
+          x: chunkX,
+          z: chunkZ + 1
+        });
+        vizinhosParaAtualizar.forEach(n => {
+          const chaveVizinho = obterChaveChunk(n.x, n.z);
+          if (meshesChunks.has(chaveVizinho)) {
+            descartarMeshChunk(n.x, n.z);
+            criarMeshChunk(n.x, n.z);
+          }
+        });
+      }
+    }
+
+    function gerarDadosChunk(chunkX, chunkZ) {
+      const dadosChunk = Array(TAMANHO_CHUNK_X).fill(0).map(() =>
+        Array(TAMANHO_CHUNK_Z).fill(0).map(() =>
+          new Uint8Array(TAMANHO_CHUNK_Y).fill(TIPO_BLOCO.AR)
+        )
+      );
+      const alturaBase = Math.floor(ALTURA_MUNDO * 0.3);
+      for (let lx = 0; lx < TAMANHO_CHUNK_X; lx++) {
+        for (let lz = 0; lz < TAMANHO_CHUNK_Z; lz++) {
+          const mundoX = chunkX * TAMANHO_CHUNK_X + lx;
+          const mundoZ = chunkZ * TAMANHO_CHUNK_Z + lz;
+          const valorRuido = ruidoOctaves(mundoX, mundoZ, 5, 0.5, 2.0, 0.012);
+          const alturaTerreno = alturaBase + Math.floor(valorRuido * ALTURA_MUNDO * 0.25);
+          const alturaPedra = alturaTerreno - (3 + Math.floor(Math.random() * 3));
+          for (let ly = 0; ly < TAMANHO_CHUNK_Y; ly++) {
+            if (ly < alturaPedra) {
+              // Camada de pedra com minérios
+              if (ly < alturaPedra * 0.3) {
+                // Camadas mais profundas - minérios raros
+                const rand = Math.random();
+                if (rand < 0.0005) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.DIAMANTE;
+                } else if (rand < 0.002) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.OURO;
+                } else if (rand < 0.01) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.FERRO;
+                } else if (rand < 0.03) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.CARVAO;
+                } else {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.PEDRA;
+                }
+              } else if (ly < alturaPedra * 0.7) {
+                // Camadas intermediárias - minérios comuns
+                const rand = Math.random();
+                if (rand < 0.0002) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.DIAMANTE;
+                } else if (rand < 0.001) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.OURO;
+                } else if (rand < 0.005) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.FERRO;
+                } else if (rand < 0.02) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.CARVAO;
+                } else {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.PEDRA;
+                }
+              } else {
+                // Camadas superiores - principalmente pedra
+                const rand = Math.random();
+                if (rand < 0.0001) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.DIAMANTE;
+                } else if (rand < 0.0005) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.OURO;
+                } else if (rand < 0.002) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.FERRO;
+                } else if (rand < 0.01) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.CARVAO;
+                } else if (rand < 0.05) {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.PEDREGULHO;
+                } else {
+                  dadosChunk[lx][lz][ly] = TIPO_BLOCO.PEDRA;
+                }
+              }
+            } else if (ly < alturaTerreno - 1) {
+              dadosChunk[lx][lz][ly] = TIPO_BLOCO.TERRA;
+            } else if (ly < alturaTerreno) {
+              // Camada superficial - pode ser grama, areia ou neve
+              const temperatura = ruidoOctaves(mundoX * 0.1, mundoZ * 0.1, 2, 0.5, 2.0, 0.05);
+              const umidade = ruidoOctaves(mundoX * 0.1 + 1000, mundoZ * 0.1 + 1000, 2, 0.5, 2.0, 0.05);
+              if (temperatura < -0.3) {
+                // Área fria - neve
+                dadosChunk[lx][lz][ly] = TIPO_BLOCO.NEVE;
+                // Substituir algumas camadas abaixo por gelo
+                if (Math.random() < 0.3) {
+                  for (let yl = ly - 1; yl > ly - 4 && yl >= 0; yl--) {
+                    if (dadosChunk[lx][lz][yl] === TIPO_BLOCO.TERRA) {
+                      dadosChunk[lx][lz][yl] = TIPO_BLOCO.GELO;
+                    }
+                  }
+                }
+              } else if (umidade < -0.2) {
+                // Área seca - areia
+                dadosChunk[lx][lz][ly] = TIPO_BLOCO.AREIA;
+                // Substituir algumas camadas abaixo por areia
+                for (let yl = ly - 1; yl > ly - 3 && yl >= 0; yl--) {
+                  if (dadosChunk[lx][lz][yl] === TIPO_BLOCO.TERRA) {
+                    dadosChunk[lx][lz][yl] = TIPO_BLOCO.AREIA;
+                  }
+                }
+              } else {
+                // Área normal - grama
+                dadosChunk[lx][lz][ly] = TIPO_BLOCO.GRAMA;
+              }
+            }
+          }
+          // Gerar árvores em blocos de grama
+          if (dadosChunk[lx][lz][alturaTerreno - 1] === TIPO_BLOCO.GRAMA && Math.random() < 0.015) {
+            const alturaArvore = Math.floor(Math.random() * 4) + 4;
+            for (let h = 0; h < alturaArvore; h++) {
+              if (alturaTerreno + h < TAMANHO_CHUNK_Y) {
+                dadosChunk[lx][lz][alturaTerreno + h] = TIPO_BLOCO.MADEIRA;
+              }
+            }
+            const raioFolhas = 2.5;
+            const raioFolhasInt = Math.ceil(raioFolhas);
+            const centroYFolhas = alturaTerreno + alturaArvore - 1;
+            for (let dy = -raioFolhasInt; dy <= raioFolhasInt; dy++) {
+              for (let dx = -raioFolhasInt; dx <= raioFolhasInt; dx++) {
+                for (let dz = -raioFolhasInt; dz <= raioFolhasInt; dz++) {
+                  const distSq = dx * dx + dy * dy + dz * dz;
+                  if (distSq > raioFolhas * raioFolhas) continue;
+                  const alvoX = lx + dx;
+                  const alvoY = centroYFolhas + dy;
+                  const alvoZ = lz + dz;
+                  if (alvoX >= 0 && alvoX < TAMANHO_CHUNK_X &&
+                    alvoY >= 0 && alvoY < TAMANHO_CHUNK_Y &&
+                    alvoZ >= 0 && alvoZ < TAMANHO_CHUNK_Z) {
+                    const alvoYFinal = Math.floor(alvoY);
+                    if (dadosChunk[alvoX]?.[alvoZ]?.[alvoYFinal] === TIPO_BLOCO.AR) {
+                      dadosChunk[alvoX][alvoZ][alvoYFinal] = TIPO_BLOCO.FOLHAS;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          // Pequena chance de gerar um lago
+          if (alturaTerreno > 10 && Math.random() < 0.005) {
+            const profundidadeLago = Math.floor(Math.random() * 3) + 3;
+            const raioLago = Math.floor(Math.random() * 4) + 3;
+            for (let dx = -raioLago; dx <= raioLago; dx++) {
+              for (let dz = -raioLago; dz <= raioLago; dz++) {
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > raioLago) continue;
+                const alvoX = lx + dx;
+                const alvoZ = lz + dz;
+                if (alvoX >= 0 && alvoX < TAMANHO_CHUNK_X &&
+                  alvoZ >= 0 && alvoZ < TAMANHO_CHUNK_Z) {
+                  // Cavar o lago
+                  for (let y = alturaTerreno; y > alturaTerreno - profundidadeLago && y >= 0; y--) {
+                    dadosChunk[alvoX][alvoZ][y] = TIPO_BLOCO.AR;
+                  }
+                  // Preencher com água
+                  if (alturaTerreno - profundidadeLago >= 0) {
+                    dadosChunk[alvoX][alvoZ][alturaTerreno - profundidadeLago] = TIPO_BLOCO.AGUA;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      return dadosChunk;
+    }
+    const geometriaCaixaCompartilhada = new THREE.BoxGeometry(1, 1, 1);
+
+    function criarMeshChunk(chunkX, chunkZ) {
+      const chave = obterChaveChunk(chunkX, chunkZ);
+      let dadosChunk = chunksMundo.get(chave);
+      if (!dadosChunk) {
+        dadosChunk = gerarDadosChunk(chunkX, chunkZ);
+        chunksMundo.set(chave, dadosChunk);
+      }
+      descartarMeshChunk(chunkX, chunkZ);
+      const origemChunkX = chunkX * TAMANHO_CHUNK_X;
+      const origemChunkZ = chunkZ * TAMANHO_CHUNK_Z;
+      const matriz = new THREE.Matrix4();
+      const instancias = {};
+      for (let lx = 0; lx < TAMANHO_CHUNK_X; lx++) {
+        for (let lz = 0; lz < TAMANHO_CHUNK_Z; lz++) {
+          for (let ly = 0; ly < TAMANHO_CHUNK_Y; ly++) {
+            const tipoBloco = dadosChunk[lx][lz][ly];
+            if (tipoBloco === TIPO_BLOCO.AR) continue;
+            const mundoX = origemChunkX + lx;
+            const mundoY = ly;
+            const mundoZ = origemChunkZ + lz;
+            const estaExposto =
+              ehTransparenteOuAr(obterBlocoMundo(mundoX + 1, mundoY, mundoZ)) ||
+              ehTransparenteOuAr(obterBlocoMundo(mundoX - 1, mundoY, mundoZ)) ||
+              ehTransparenteOuAr(obterBlocoMundo(mundoX, mundoY + 1, mundoZ)) ||
+              ehTransparenteOuAr(obterBlocoMundo(mundoX, mundoY - 1, mundoZ)) ||
+              ehTransparenteOuAr(obterBlocoMundo(mundoX, mundoY, mundoZ + 1)) ||
+              ehTransparenteOuAr(obterBlocoMundo(mundoX, mundoY, mundoZ - 1));
+            if (estaExposto) {
+              if (!instancias[tipoBloco]) instancias[tipoBloco] = [];
+              matriz.setPosition(mundoX + 0.5, mundoY + 0.5, mundoZ + 0.5);
+              instancias[tipoBloco].push(matriz.clone());
+            }
+          }
+        }
+      }
+      const grupoMeshChunk = {};
+      for (const tipoStr in instancias) {
+        const tipo = parseInt(tipoStr);
+        const matrizesInstancias = instancias[tipo];
+        const contagem = matrizesInstancias.length;
+        if (contagem === 0) continue;
+        const material = materiaisCarregados[tipo];
+        if (!material) continue;
+        const mesh = new THREE.InstancedMesh(geometriaCaixaCompartilhada, material, contagem);
+        mesh.name = `chunk_${chave}_tipo_${tipo}`;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.chunkKey = chave;
+        for (let i = 0; i < contagem; i++) {
+          mesh.setMatrixAt(i, matrizesInstancias[i]);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        cena.add(mesh);
+        grupoMeshChunk[tipo] = mesh;
+      }
+      if (Object.keys(grupoMeshChunk).length > 0) {
+        meshesChunks.set(chave, grupoMeshChunk);
+      } else {
+        meshesChunks.delete(chave);
+      }
+    }
+
+    function descartarMeshChunk(chunkX, chunkZ) {
+      const chave = obterChaveChunk(chunkX, chunkZ);
+      const grupoMesh = meshesChunks.get(chave);
+      if (grupoMesh) {
+        for (const tipo in grupoMesh) {
+          cena.remove(grupoMesh[tipo]);
+        }
+        meshesChunks.delete(chave);
+      }
+    }
+
+    function ehTransparenteOuAr(tipoBloco) {
+      return tipoBloco === TIPO_BLOCO.AR || tipoBloco === TIPO_BLOCO.FOLHAS;
+    }
+
+    function atualizarChunksVisiveis(forcarCarregar = false) {
+      const posCam = controles.getObject().position;
+      const {
+        x: chunkAtualX,
+        z: chunkAtualZ
+      } = obterCoordsChunk(posCam.x, posCam.z);
+      if (!forcarCarregar && chunkAtualX === jogador.chunkAtual.x && chunkAtualZ === jogador.chunkAtual.z) return;
+      const chunkMudou = jogador.chunkAtual.x !== chunkAtualX || jogador.chunkAtual.z !== chunkAtualZ;
+      jogador.chunkAtual = {
+        x: chunkAtualX,
+        z: chunkAtualZ
+      };
+      if (chunkMudou) atualizarAlvoLuz();
+      const chunksParaManter = new Set();
+      const chunksParaCarregar = [];
+      for (let dx = -DISTANCIA_RENDER; dx <= DISTANCIA_RENDER; dx++) {
+        for (let dz = -DISTANCIA_RENDER; dz <= DISTANCIA_RENDER; dz++) {
+          if (dx * dx + dz * dz > DISTANCIA_RENDER * DISTANCIA_RENDER) continue;
+          const chunkX = chunkAtualX + dx;
+          const chunkZ = chunkAtualZ + dz;
+          const chave = obterChaveChunk(chunkX, chunkZ);
+          chunksParaManter.add(chave);
+          if (!meshesChunks.has(chave)) {
+            chunksParaCarregar.push({
+              x: chunkX,
+              z: chunkZ
+            });
+          }
+        }
+      }
+      for (const chave of meshesChunks.keys()) {
+        if (!chunksParaManter.has(chave)) {
+          const [cxStr, czStr] = chave.split(',');
+          descartarMeshChunk(parseInt(cxStr), parseInt(czStr));
+          chunksMundo.delete(chave);
+        }
+      }
+      chunksParaCarregar.forEach(coords => {
+        if (!meshesChunks.has(obterChaveChunk(coords.x, coords.z))) {
+          criarMeshChunk(coords.x, coords.z);
+        }
+      });
+    }
+    // --- Colisão e interação ---
+    function verificarColisao(posicao, verificarChao = false) {
+      const offsetVerificacaoChao = verificarChao ? 0.1 : 0;
+      const caixaJogador = new THREE.Box3(
+        new THREE.Vector3(
+          posicao.x - jogador.raio,
+          posicao.y - jogador.altura - offsetVerificacaoChao,
+          posicao.z - jogador.raio
+        ),
+        new THREE.Vector3(
+          posicao.x + jogador.raio,
+          posicao.y,
+          posicao.z + jogador.raio
+        )
+      );
+      const minX = Math.floor(caixaJogador.min.x);
+      const maxX = Math.ceil(caixaJogador.max.x);
+      const minY = Math.floor(caixaJogador.min.y);
+      const maxY = Math.ceil(caixaJogador.max.y);
+      const minZ = Math.floor(caixaJogador.min.z);
+      const maxZ = Math.ceil(caixaJogador.max.z);
+      for (let mundoX = minX; mundoX < maxX; mundoX++) {
+        for (let mundoY = minY; mundoY < maxY; mundoY++) {
+          for (let mundoZ = minZ; mundoZ < maxZ; mundoZ++) {
+            const tipoBloco = obterBlocoMundo(mundoX, mundoY, mundoZ);
+            if (ehSolido(tipoBloco)) {
+              const caixaBloco = new THREE.Box3(
+                new THREE.Vector3(mundoX, mundoY, mundoZ),
+                new THREE.Vector3(mundoX + 1, mundoY + 1, mundoZ + 1)
+              );
+              if (caixaJogador.intersectsBox(caixaBloco)) return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function ehSolido(tipoBloco) {
+      return tipoBloco !== TIPO_BLOCO.AR && tipoBloco !== TIPO_BLOCO.FOLHAS && tipoBloco !== TIPO_BLOCO.AGUA;
+    }
+
+    function manipularInteracaoBloco(evento) {
+      if (!controles || !controles.isLocked) return;
+      raycastEInteragir(evento.button);
+    }
+
+    function raycastEInteragir(botao) {
+      raycaster.setFromCamera({
+        x: 0,
+        y: 0
+      }, camera);
+      const direcao = raycaster.ray.direction;
+      const origem = raycaster.ray.origin;
+      let atualX = Math.floor(origem.x);
+      let atualY = Math.floor(origem.y);
+      let atualZ = Math.floor(origem.z);
+      const passoX = Math.sign(direcao.x);
+      const passoY = Math.sign(direcao.y);
+      const passoZ = Math.sign(direcao.z);
+      const proximoVoxelX = atualX + (passoX > 0 ? 1 : 0);
+      const proximoVoxelY = atualY + (passoY > 0 ? 1 : 0);
+      const proximoVoxelZ = atualZ + (passoZ > 0 ? 1 : 0);
+      let tMaxX = (direcao.x === 0) ? Infinity : (proximoVoxelX - origem.x) / direcao.x;
+      let tMaxY = (direcao.y === 0) ? Infinity : (proximoVoxelY - origem.y) / direcao.y;
+      let tMaxZ = (direcao.z === 0) ? Infinity : (proximoVoxelZ - origem.z) / direcao.z;
+      const tDeltaX = (direcao.x === 0) ? Infinity : Math.abs(1 / direcao.x);
+      const tDeltaY = (direcao.y === 0) ? Infinity : Math.abs(1 / direcao.y);
+      const tDeltaZ = (direcao.z === 0) ? Infinity : Math.abs(1 / direcao.z);
+      let coordsBlocoAtingido = null;
+      let coordsBlocoAnterior = null;
+      let distancia = 0;
+      for (let i = 0; i < DISTANCIA_MAX_RAYCAST * 2; i++) {
+        const tipoBloco = obterBlocoMundo(atualX, atualY, atualZ);
+        if (ehSolido(tipoBloco)) {
+          coordsBlocoAtingido = {
+            x: atualX,
+            y: atualY,
+            z: atualZ
+          };
+          break;
+        }
+        coordsBlocoAnterior = {
+          x: atualX,
+          y: atualY,
+          z: atualZ
+        };
+        let tPasso;
+        if (tMaxX < tMaxY) {
+          if (tMaxX < tMaxZ) {
+            tPasso = tMaxX;
+            atualX += passoX;
+            tMaxX += tDeltaX;
+          } else {
+            tPasso = tMaxZ;
+            atualZ += passoZ;
+            tMaxZ += tDeltaZ;
+          }
+        } else {
+          if (tMaxY < tMaxZ) {
+            tPasso = tMaxY;
+            atualY += passoY;
+            tMaxY += tDeltaY;
+          } else {
+            tPasso = tMaxZ;
+            atualZ += passoZ;
+            tMaxZ += tDeltaZ;
+          }
+        }
+        distancia = tPasso;
+        if (distancia > DISTANCIA_MAX_RAYCAST) break;
+      }
+      if (botao === 0 && coordsBlocoAtingido) {
+        definirBlocoMundo(coordsBlocoAtingido.x, coordsBlocoAtingido.y, coordsBlocoAtingido.z, TIPO_BLOCO.AR);
+      } else if (botao === 2 && coordsBlocoAtingido && coordsBlocoAnterior) {
+        const posOlhosJogador = jogador.posicao;
+        const posPeJogador = posOlhosJogador.y - jogador.altura;
+        const posCabecaJogador = posOlhosJogador.y;
+        const minXJogador = posOlhosJogador.x - jogador.raio;
+        const maxXJogador = posOlhosJogador.x + jogador.raio;
+        const minZJogador = posOlhosJogador.z - jogador.raio;
+        const maxZJogador = posOlhosJogador.z + jogador.raio;
+        const posX = coordsBlocoAnterior.x;
+        const posY = coordsBlocoAnterior.y;
+        const posZ = coordsBlocoAnterior.z;
+        const intersectaX = maxXJogador > posX && minXJogador < posX + 1;
+        const intersectaZ = maxZJogador > posZ && minZJogador < posZ + 1;
+        const intersectaY = posCabecaJogador > posY && posPeJogador < posY + 1;
+        if (!(intersectaX && intersectaY && intersectaZ)) {
+          definirBlocoMundo(coordsBlocoAnterior.x, coordsBlocoAnterior.y, coordsBlocoAnterior.z, blocoParaColocar);
+        }
+      }
+    }
+    // --- Manipuladores de eventos ---
+    function aoRedimensionarJanela() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderizador.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function aoPressionarTecla(evento) {
+      switch (evento.code) {
+        case 'KeyW':
+          moverFrente = true;
+          break;
+        case 'KeyA':
+          moverEsquerda = true;
+          break;
+        case 'KeyS':
+          moverTras = true;
+          break;
+        case 'KeyD':
+          moverDireita = true;
+          break;
+        case 'Space':
+          moverCima = true;
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          moverBaixo = true;
+          break;
+        case 'KeyF':
+          jogador.modoVoo = !jogador.modoVoo;
+          jogador.velocidadeAtual.y = 0;
+          console.log("Modo voo:", jogador.modoVoo);
+          break;
+        case 'Digit1':
+          blocoParaColocar = TIPO_BLOCO.PEDRA;
+          break;
+        case 'Digit2':
+          blocoParaColocar = TIPO_BLOCO.TERRA;
+          break;
+        case 'Digit3':
+          blocoParaColocar = TIPO_BLOCO.GRAMA;
+          break;
+        case 'Digit4':
+          blocoParaColocar = TIPO_BLOCO.MADEIRA;
+          break;
+        case 'Digit5':
+          blocoParaColocar = TIPO_BLOCO.FOLHAS;
+          break;
+        case 'Digit6':
+          blocoParaColocar = TIPO_BLOCO.AREIA;
+          break;
+        case 'Digit7':
+          blocoParaColocar = TIPO_BLOCO.AGUA;
+          break;
+        case 'Digit8':
+          blocoParaColocar = TIPO_BLOCO.NEVE;
+          break;
+        case 'Digit9':
+          blocoParaColocar = TIPO_BLOCO.GELO;
+          break;
+        case 'Digit0':
+          blocoParaColocar = TIPO_BLOCO.LADRILLO;
+          break;
+      }
+      if (evento.code.startsWith('Digit')) {
+        divInfoBloco.textContent = `Bloco: ${NOMES_BLOCOS[blocoParaColocar]}`;
+      }
+    }
+
+    function aoSoltarTecla(evento) {
+      switch (evento.code) {
+        case 'KeyW':
+          moverFrente = false;
+          break;
+        case 'KeyA':
+          moverEsquerda = false;
+          break;
+        case 'KeyS':
+          moverTras = false;
+          break;
+        case 'KeyD':
+          moverDireita = false;
+          break;
+        case 'Space':
+          moverCima = false;
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          moverBaixo = false;
+          break;
+      }
+    }
+
+    function aoClicarMouse(evento) {
+      manipularInteracaoBloco(evento);
+    }
+    // --- Atualização do alvo da luz ---
+    function atualizarAlvoLuz() {
+      if (luzSol && jogador.chunkAtual.x !== null) {
+        const alvoX = jogador.chunkAtual.x * TAMANHO_CHUNK_X + TAMANHO_CHUNK_X / 2;
+        const alvoZ = jogador.chunkAtual.z * TAMANHO_CHUNK_Z + TAMANHO_CHUNK_Z / 2;
+        luzSol.target.position.set(alvoX, 0, alvoZ);
+        luzLua.target.position.set(alvoX, 0, alvoZ);
+        luzSol.target.updateMatrixWorld();
+      }
+    }
+    // --- Atualização da atmosfera ---
+    const corTemp = new THREE.Color();
+
+    function atualizarAtmosfera(delta) {
+      tempoJogo += delta / CICLO_DIA_SEGUNDOS;
+      tempoJogo %= 1.0;
+      const anguloSol = tempoJogo * Math.PI * 2;
+      const distanciaSol = DISTANCIA_RENDER * TAMANHO_CHUNK_X * 0.8;
+      const posXSol = Math.cos(anguloSol) * distanciaSol;
+      const posYSol = Math.sin(anguloSol) * distanciaSol;
+      const posZSol = 0;
+      const posAlvo = luzSol.target.position;
+      luzSol.position.set(posAlvo.x + posXSol, posAlvo.y + posYSol + 50, posAlvo.z + posZSol);
+      luzLua.position.set(posAlvo.x - posXSol, posAlvo.y - posYSol + 50, posAlvo.z - posZSol);
+      meshSol.position.copy(luzSol.position);
+      meshLua.position.copy(luzLua.position);
+      const tempoAmanhecer = 0.22,
+        tempoDia = 0.28,
+        tempoEntardecer = 0.72,
+        tempoNoite = 0.78;
+      const duracaoTransicao = tempoDia - tempoAmanhecer;
+      let corCeu, corChao, corSol;
+      let intensidadeSol = 0,
+        intensidadeLua = 0,
+        intensidadeHemi = 0,
+        opacidadeEstrelas = 0;
+      if (tempoJogo >= tempoAmanhecer && tempoJogo < tempoDia) {
+        const t = (tempoJogo - tempoAmanhecer) / duracaoTransicao;
+        corCeu = corTemp.copy(coresCeus.amanhecer).lerp(coresCeus.dia, t);
+        corChao = corTemp.copy(coresChao.amanhecer).lerp(coresChao.dia, t);
+        corSol = corTemp.copy(coresLuzSol.amanhecer).lerp(coresLuzSol.dia, t);
+        intensidadeSol = lerp(0.5, 1.8, t);
+        intensidadeHemi = lerp(0.4, 1.0, t);
+        opacidadeEstrelas = lerp(0.8, 0, t);
+      } else if (tempoJogo >= tempoDia && tempoJogo < tempoEntardecer) {
+        corCeu = coresCeus.dia;
+        corChao = coresChao.dia;
+        corSol = coresLuzSol.dia;
+        const fatorMeioDia = 1.0 - Math.abs(tempoJogo - 0.5) / (tempoEntardecer - 0.5);
+        intensidadeSol = lerp(1.0, 1.8, fatorMeioDia);
+        intensidadeHemi = 1.0;
+        opacidadeEstrelas = 0;
+      } else if (tempoJogo >= tempoEntardecer && tempoJogo < tempoNoite) {
+        const t = (tempoJogo - tempoEntardecer) / duracaoTransicao;
+        corCeu = corTemp.copy(coresCeus.entardecer).lerp(coresCeus.noite, t);
+        corChao = corTemp.copy(coresChao.entardecer).lerp(coresChao.noite, t);
+        corSol = corTemp.copy(coresLuzSol.entardecer).lerp(coresLuzSol.noite, t);
+        intensidadeSol = lerp(1.0, 0.0, t);
+        intensidadeLua = lerp(0.0, 0.15, t);
+        intensidadeHemi = lerp(1.0, 0.2, t);
+        opacidadeEstrelas = lerp(0, 0.9, t);
+      } else {
+        corCeu = coresCeus.noite;
+        corChao = coresChao.noite;
+        corSol = coresLuzSol.noite;
+        intensidadeSol = 0.0;
+        intensidadeLua = 0.15;
+        intensidadeHemi = 0.2;
+        opacidadeEstrelas = 0.9;
+      }
+      cena.background = corCeu;
+      cena.fog.color.copy(corCeu);
+      cena.fog.near = DISTANCIA_RENDER * TAMANHO_CHUNK_X * (intensidadeHemi < 0.5 ? 0.3 : 0.4);
+      cena.fog.far = DISTANCIA_RENDER * TAMANHO_CHUNK_X * (intensidadeHemi < 0.5 ? 0.9 : 1.0);
+      luzHemisfério.color.copy(corCeu);
+      luzHemisfério.groundColor.copy(corChao);
+      luzHemisfério.intensity = intensidadeHemi;
+      luzSol.color.copy(corSol);
+      luzSol.intensity = intensidadeSol;
+      luzSol.castShadow = intensidadeSol > 0.01;
+      luzLua.intensity = intensidadeLua;
+      meshSol.visible = posYSol > -meshSol.geometry.parameters.radius * 2;
+      meshLua.visible = -posYSol > -meshLua.geometry.parameters.radius * 2;
+      if (divEstrelas) {
+        divEstrelas.style.opacity = opacidadeEstrelas;
+      }
+    }
+
+    function formatarTempo(tempo) {
+      const horas = Math.floor(tempo * 24);
+      const minutos = Math.floor((tempo * 24 * 60) % 60);
+      return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+    }
+    // --- Atualização da animação da tocha ---
+    function atualizarAnimacaoTocha(delta, tempo) {
+      if (!meshTocha || !luzTocha || !meshChama) return;
+      const posBase = new THREE.Vector3(0.30, -0.25, -0.45);
+      const rotBase = new THREE.Euler(0, -Math.PI / 16, Math.PI / 14);
+      meshTocha.position.copy(posBase);
+      meshTocha.rotation.copy(rotBase);
+      const estaMovendoXZ = Math.abs(jogador.velocidadeAtual.x) > 0.1 || Math.abs(jogador.velocidadeAtual.z) > 0.1;
+      const estaMovendoY = Math.abs(jogador.velocidadeAtual.y) > 0.1;
+      const aplicarBalanco = (estaMovendoXZ && jogador.noChao) || (jogador.modoVoo && (estaMovendoXZ || estaMovendoY));
+      if (aplicarBalanco) {
+        anguloBalancoTocha += velocidadeBalanco * delta;
+        meshTocha.position.y += Math.sin(anguloBalancoTocha) * quantidadeBalanco;
+        meshTocha.position.x -= Math.cos(anguloBalancoTocha * 0.5) * quantidadeBalanco * 0.5;
+      } else {
+        anguloBalancoTocha = 0;
+      }
+      const oscilacao = Math.sin(tempo * velocidadeOscilacao) * quantidadeOscilacao;
+      luzTocha.intensity = intensidadeBaseLuz + oscilacao;
+      const escalaChama = 1.0 + Math.sin(tempo * velocidadeOscilacao * 0.8 + 0.5) * 0.1;
+      const posYChama = Math.sin(tempo * velocidadeOscilacao * 1.2 + 1.0) * 0.01;
+      meshChama.scale.y = escalaChama;
+      meshChama.position.y = luzTocha.position.y + posYChama;
+    }
+    // --- Atualização das partículas da tocha ---
+    function atualizarParticulasTocha(delta) {
+      if (!sistemaParticulas || !geometriaParticulas || !meshChama) return;
+      const posicoes = geometriaParticulas.attributes.position.array;
+      const baseYChama = meshChama.position.y - meshChama.geometry.parameters.radius * 0.5;
+      for (let i = 0; i < contagemParticulas; i++) {
+        const i3 = i * 3;
+        temposVidaParticulas[i] -= delta;
+        if (temposVidaParticulas[i] <= 0) {
+          posicoes[i3] = (Math.random() - 0.5) * raioSpawnParticulas * 2;
+          posicoes[i3 + 1] = baseYChama + Math.random() * 0.05;
+          posicoes[i3 + 2] = (Math.random() - 0.5) * raioSpawnParticulas * 2;
+          velocidadesParticulas[i].set(
+            (Math.random() - 0.5) * variacaoVelocidade * 0.5,
+            velocidadeBaseY + Math.random() * variacaoVelocidade,
+            (Math.random() - 0.5) * variacaoVelocidade * 0.5
+          );
+          temposVidaParticulas[i] = tempoBaseVidaParticula + (Math.random() - 0.5) * variacaoTempoVida * 2;
+        } else {
+          posicoes[i3] += velocidadesParticulas[i].x * delta;
+          posicoes[i3 + 1] += velocidadesParticulas[i].y * delta;
+          posicoes[i3 + 2] += velocidadesParticulas[i].z * delta;
+          velocidadesParticulas[i].y -= gravidadeParticulas * delta;
+        }
+      }
+      geometriaParticulas.attributes.position.needsUpdate = true;
+    }
+    // --- Loop principal do jogo ---
+    function animar() {
+      requestAnimationFrame(animar);
+      if (!relogio) return;
+      const delta = Math.min(relogio.getDelta(), 0.05);
+      const tempo = relogio.elapsedTime;
+      atualizarAtmosfera(delta);
+      if (controles && controles.isLocked === true) {
+        // --- Movimentação do jogador ---
+        jogador.direcao.z = Number(moverFrente) - Number(moverTras);
+        jogador.direcao.x = Number(moverDireita) - Number(moverEsquerda);
+        jogador.direcao.normalize();
+        const direcaoCamera = new THREE.Vector3();
+        controles.getDirection(direcaoCamera);
+        const frente = new THREE.Vector3(direcaoCamera.x, 0, direcaoCamera.z).normalize();
+        const direita = new THREE.Vector3().crossVectors(frente, camera.up).normalize();
+        const velocidadeAtual = jogador.modoVoo ? jogador.velocidadeVoo : jogador.velocidade;
+        const velocidadeAlvoXZ = new THREE.Vector3();
+        velocidadeAlvoXZ.addScaledVector(frente, jogador.direcao.z);
+        velocidadeAlvoXZ.addScaledVector(direita, jogador.direcao.x);
+        if (velocidadeAlvoXZ.lengthSq() > 0) {
+          velocidadeAlvoXZ.normalize().multiplyScalar(velocidadeAtual);
+        }
+        jogador.velocidadeAtual.x = velocidadeAlvoXZ.x;
+        jogador.velocidadeAtual.z = velocidadeAlvoXZ.z;
+        // --- Movimentação vertical e gravidade ---
+        if (jogador.modoVoo) {
+          const velocidadeVertical = jogador.velocidadeVoo;
+          if (moverCima) jogador.velocidadeAtual.y = velocidadeVertical;
+          else if (moverBaixo) jogador.velocidadeAtual.y = -velocidadeVertical;
+          else jogador.velocidadeAtual.y = 0;
+          jogador.noChao = false;
+        } else {
+          jogador.velocidadeAtual.y -= gravidade * delta;
+          if (moverCima && jogador.noChao) {
+            jogador.velocidadeAtual.y = jogador.velocidadePulo;
+            jogador.noChao = false;
+          }
+        }
+        // --- Resolução de colisões ---
+        const posAntiga = controles.getObject().position.clone();
+        let posNova = posAntiga.clone();
+        posNova.x += jogador.velocidadeAtual.x * delta;
+        if (verificarColisao(posNova)) {
+          posNova.x = posAntiga.x;
+          jogador.velocidadeAtual.x = 0;
+        }
+        posAntiga.x = posNova.x;
+        posNova.z += jogador.velocidadeAtual.z * delta;
+        if (verificarColisao(posNova)) {
+          posNova.z = posAntiga.z;
+          jogador.velocidadeAtual.z = 0;
+        }
+        posAntiga.z = posNova.z;
+        posNova.y += jogador.velocidadeAtual.y * delta;
+        const colisaoVertical = verificarColisao(posNova);
+        jogador.noChao = false;
+        if (colisaoVertical) {
+          if (jogador.velocidadeAtual.y <= 0) {
+            const peIntencaoY = posNova.y - jogador.altura;
+            const peSnapY = Math.floor(peIntencaoY) + 1;
+            posNova.y = peSnapY + jogador.altura + 0.001;
+            jogador.noChao = true;
+            jogador.velocidadeAtual.y = 0;
+          } else {
+            const cabecaIntencaoY = posNova.y;
+            const cabecaSnapY = Math.floor(cabecaIntencaoY);
+            posNova.y = cabecaSnapY - 0.001;
+            jogador.velocidadeAtual.y = 0;
+          }
+        } else {
+          if (!jogador.modoVoo && jogador.velocidadeAtual.y <= 0) {
+            if (verificarColisao(posNova, true)) {
+              /* Verificar chão */
+            }
+          }
+        }
+        controles.getObject().position.copy(posNova);
+        jogador.posicao.copy(posNova);
+      } else if (jogador && jogador.velocidadeAtual) {
+        jogador.velocidadeAtual.x *= 0.9;
+        jogador.velocidadeAtual.z *= 0.9;
+      }
+      if (meshTocha) {
+        atualizarAnimacaoTocha(delta, tempo);
+      }
+      if (sistemaParticulas) {
+        atualizarParticulasTocha(delta);
+      }
+      atualizarChunksVisiveis();
+      if (jogador && jogador.posicao && jogador.chunkAtual && divInfo) {
+        const pos = jogador.posicao;
+        divInfo.textContent = `Pos: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}) Chunk: ${jogador.chunkAtual.x ?? 'N/A'},${jogador.chunkAtual.z ?? 'N/A'} Voo: ${jogador.modoVoo} Chao: ${jogador.noChao} Hora: ${formatarTempo(tempoJogo)}`;
+      }
+      if (renderizador && cena && camera) {
+        renderizador.render(cena, camera);
+      }
+    }
+    // --- Iniciar ---
+    try {
+      inicializar();
+    } catch (erro) {
+      console.error("Falha na inicialização:", erro);
+      const bloqueador = document.getElementById('blocker');
+      const instrucoes = document.getElementById('instructions');
+      if (bloqueador && instrucoes) {
+        bloqueador.classList.add('error');
+        instrucoes.innerHTML = `<h2>Erro</h2> Falha na inicialização. Verifique o console (F12).<br><pre>${erro.message}\n${erro.stack}</pre>`;
+        bloqueador.style.display = 'flex';
+      }
+      if (renderizador && renderizador.domElement && renderizador.domElement.parentNode) {
+        renderizador.domElement.parentNode.removeChild(renderizador.domElement);
+      }
+    }
+  </script>
+</body>
+
+</html>
