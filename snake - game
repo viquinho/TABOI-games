@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Snake - TABOI Games</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #00ffcc;
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    #intro {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      animation: fadeOut 3s forwards 3s;
+      z-index: 10;
+    }
+
+    #intro h1 {
+      font-size: 3em;
+      color: #00ffcc;
+      text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc;
+      animation: blink 1s infinite;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    @keyframes fadeOut {
+      to { opacity: 0; visibility: hidden; }
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px #00ffcc;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    canvas {
+      background-color: #1a1a1a;
+      border: 3px solid #00ffcc;
+      box-shadow: 0 0 20px #00ffcc88;
+      max-width: 100%;
+    }
+
+    #config-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 1.5em;
+      background: none;
+      color: #00ffcc;
+      border: none;
+      cursor: pointer;
+      z-index: 12;
+    }
+
+    #config-menu, #ranking-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #111;
+      border: 2px solid #00ffcc;
+      box-shadow: 0 0 20px #00ffcc88;
+      padding: 20px;
+      display: none;
+      z-index: 11;
+      width: 80%;
+      max-width: 300px;
+    }
+
+    #config-menu label, #config-menu button {
+      color: #00ffcc;
+      display: block;
+      margin: 10px 0;
+    }
+
+    #config-menu input[type="color"], input[type="range"] {
+      width: 100%;
+    }
+
+    #countdown {
+      font-size: 3em;
+      color: #00ffcc;
+      margin-top: 10px;
+      display: none;
+    }
+
+    #ranking-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin: 10px 0;
+    }
+
+    .ranking-item {
+      padding: 5px;
+      border-bottom: 1px solid #00ffcc33;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .modal-title {
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: #00ffcc;
+      font-size: 1.5em;
+      cursor: pointer;
+    }
+
+    #controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .control-row {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .control-btn {
+      background: rgba(0, 255, 204, 0.2);
+      color: #00ffcc;
+      border: 2px solid #00ffcc;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      margin: 5px;
+      font-size: 1.5em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .control-btn:active {
+      background: rgba(0, 255, 204, 0.4);
+    }
+
+    @media (max-width: 500px) {
+      canvas {
+        width: 90vw;
+        height: 90vw;
+      }
+      
+      h1 {
+        font-size: 1.5em;
+      }
+      
+      .control-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="intro">
+    <h1>👾 TABOI - Games Apresenta 👾</h1>
+  </div>
+
+  <button id="config-btn">⚙️</button>
+
+  <h1>Jogo da Cobrinha 🐍</h1>
+  <canvas id="game" width="400" height="400"></canvas>
+  <div id="countdown"></div>
+
+  <div id="controls">
+    <div class="control-row">
+      <button class="control-btn" id="up-btn">↑</button>
+    </div>
+    <div class="control-row">
+      <button class="control-btn" id="left-btn">←</button>
+      <button class="control-btn" id="down-btn">↓</button>
+      <button class="control-btn" id="right-btn">→</button>
+    </div>
+  </div>
+
+  <div id="config-menu">
+    <label>🎨 Cor da cobrinha:
+      <input type="color" id="snakeColor" value="#00ffcc">
+    </label>
+    <label>🔊 Volume da música:
+      <input type="range" id="volumeControl" min="0" max="1" step="0.01" value="0.5">
+    </label>
+    <button onclick="showCredits()">👨‍💻 Ver Créditos</button>
+    <button onclick="showRanking()">🏆 Ver Ranking</button>
+    <button onclick="closeMenu()">✅ Fechar</button>
+  </div>
+
+  <div id="ranking-modal">
+    <div class="modal-header">
+      <div class="modal-title">🏆 Ranking de Pontuações</div>
+      <button class="close-btn" onclick="closeRanking()">×</button>
+    </div>
+    <div id="ranking-list">
+      <!-- Ranking será carregado aqui -->
+    </div>
+    <button onclick="closeRanking()" style="width: 100%;">✅ Fechar</button>
+  </div>
+
+  <audio id="music" loop autoplay>
+    <source src="https://cdn.pixabay.com/download/audio/2023/03/14/audio_5f93e5f61d.mp3?filename=8bit-funky-140631.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const box = 20;
+    const size = 400;
+    const total = size / box;
+
+    const configBtn = document.getElementById("config-btn");
+    const configMenu = document.getElementById("config-menu");
+    const snakeColorInput = document.getElementById("snakeColor");
+    const volumeControl = document.getElementById("volumeControl");
+    const music = document.getElementById("music");
+    const rankingModal = document.getElementById("ranking-modal");
+    const rankingList = document.getElementById("ranking-list");
+    
+    // Controles de toque
+    const upBtn = document.getElementById("up-btn");
+    const downBtn = document.getElementById("down-btn");
+    const leftBtn = document.getElementById("left-btn");
+    const rightBtn = document.getElementById("right-btn");
+
+    let snakeColor = "#00ffcc";
+    let snake, direction, food, score, game, paused = false;
+    let ranking = JSON.parse(localStorage.getItem('snakeRanking')) || [];
+
+    function resetGame() {
+      snake = [{ x: 9 * box, y: 9 * box }];
+      direction = "";
+      food = randomFood();
+      score = 0;
+      if (game) clearInterval(game);
+      game = setInterval(drawGame, 120);
+    }
+
+    function randomFood() {
+      return {
+        x: Math.floor(Math.random() * total) * box,
+        y: Math.floor(Math.random() * total) * box
+      };
+    }
+
+    function drawGame() {
+      if (paused) return;
+
+      ctx.fillStyle = "#1a1a1a";
+      ctx.fillRect(0, 0, size, size);
+
+      for (let i = 0; i < snake.length; i++) {
+        ctx.fillStyle = i === 0 ? snakeColor : darken(snakeColor, 0.6);
+        ctx.fillRect(snake[i].x, snake[i].y, box, box);
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+      }
+
+      ctx.fillStyle = "#ff4444";
+      ctx.fillRect(food.x, food.y, box, box);
+
+      let headX = snake[0].x;
+      let headY = snake[0].y;
+
+      if (direction === "UP") headY -= box;
+      if (direction === "DOWN") headY += box;
+      if (direction === "LEFT") headX -= box;
+      if (direction === "RIGHT") headX += box;
+
+      if (headX < 0 || headY < 0 || headX >= size || headY >= size) return endGame();
+      for (let i = 1; i < snake.length; i++) {
+        if (headX === snake[i].x && headY === snake[i].y) return endGame();
+      }
+
+      let newHead = { x: headX, y: headY };
+      if (headX === food.x && headY === food.y) {
+        score++;
+        food = randomFood();
+      } else {
+        snake.pop();
+      }
+      snake.unshift(newHead);
+    }
+
+    function endGame() {
+      clearInterval(game);
+      
+      // Adiciona a pontuação ao ranking
+      addToRanking(score);
+      
+      let count = 3;
+      const countdown = document.getElementById("countdown");
+      countdown.style.display = "block";
+      countdown.innerText = `Reiniciando em ${count}...`;
+      const interval = setInterval(() => {
+        count--;
+        countdown.innerText = `Reiniciando em ${count}...`;
+        if (count === 0) {
+          clearInterval(interval);
+          countdown.style.display = "none";
+          resetGame();
+        }
+      }, 1000);
+    }
+
+    function addToRanking(score) {
+      ranking.push({
+        score: score,
+        date: new Date().toLocaleDateString()
+      });
+      
+      // Ordena o ranking por pontuação (maior primeiro)
+      ranking.sort((a, b) => b.score - a.score);
+      
+      // Mantém apenas as top 10 pontuações
+      if (ranking.length > 10) {
+        ranking = ranking.slice(0, 10);
+      }
+      
+      // Salva no localStorage
+      localStorage.setItem('snakeRanking', JSON.stringify(ranking));
+    }
+
+    function showRanking() {
+      // Fecha o menu de configurações
+      closeMenu();
+      
+      // Atualiza a lista de ranking
+      rankingList.innerHTML = '';
+      
+      if (ranking.length === 0) {
+        rankingList.innerHTML = '<div class="ranking-item">Nenhuma pontuação ainda!</div>';
+      } else {
+        ranking.forEach((item, index) => {
+          const div = document.createElement('div');
+          div.className = 'ranking-item';
+          div.innerHTML = `<strong>#${index + 1}</strong> - ${item.score} pontos (${item.date})`;
+          rankingList.appendChild(div);
+        });
+      }
+      
+      // Mostra o modal de ranking
+      rankingModal.style.display = 'block';
+      paused = true;
+    }
+
+    function closeRanking() {
+      rankingModal.style.display = 'none';
+      paused = false;
+    }
+
+    // Controles de teclado
+    document.addEventListener("keydown", (e) => {
+      if (paused) return;
+      if (e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+      else if (e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+      else if (e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+      else if (e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+    });
+
+    // Controles de toque
+    upBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "DOWN") direction = "UP";
+    });
+    
+    downBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "UP") direction = "DOWN";
+    });
+    
+    leftBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "RIGHT") direction = "LEFT";
+    });
+    
+    rightBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "LEFT") direction = "RIGHT";
+    });
+
+    // Para clique com mouse também (em dispositivos com mouse)
+    upBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "DOWN") direction = "UP";
+    });
+    
+    downBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "UP") direction = "DOWN";
+    });
+    
+    leftBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "RIGHT") direction = "LEFT";
+    });
+    
+    rightBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (paused) return;
+      if (direction !== "LEFT") direction = "RIGHT";
+    });
+
+    configBtn.onclick = () => {
+      paused = true;
+      configMenu.style.display = "block";
+    };
+
+    function closeMenu() {
+      paused = false;
+      configMenu.style.display = "none";
+    }
+
+    function showCredits() {
+      alert("🎮 Jogo criado por Viquinho - Powered by TABOI Games\nMúsica por Pixabay - 8bit Funky");
+    }
+
+    snakeColorInput.oninput = (e) => {
+      snakeColor = e.target.value;
+    };
+
+    volumeControl.oninput = (e) => {
+      music.volume = e.target.value;
+    };
+
+    function darken(color, factor) {
+      const r = Math.floor(parseInt(color.substr(1, 2), 16) * factor);
+      const g = Math.floor(parseInt(color.substr(3, 2), 16) * factor);
+      const b = Math.floor(parseInt(color.substr(5, 2), 16) * factor);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Ajusta o tamanho do canvas para dispositivos móveis
+    function resizeCanvas() {
+      if (window.innerWidth <= 500) {
+        const size = Math.min(window.innerWidth * 0.9, window.innerHeight * 0.5);
+        canvas.style.width = size + "px";
+        canvas.style.height = size + "px";
+      } else {
+        canvas.style.width = "400px";
+        canvas.style.height = "400px";
+      }
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    setTimeout(() => {
+      resetGame();
+    }, 4000);
+  </script>
+</body>
+</html>
